@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kalkulator Laser Flat Cutting — Buffer 38%</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: #f5f5f5;
+  padding: 2rem 1rem;
+  color: #333;
+}
+.container { max-width: 700px; margin: 0 auto; }
+h1 { 
+  font-size: 24px; 
+  font-weight: 600; 
+  margin-bottom: 0.5rem;
+  color: #1a1a1a;
+}
+.buffer-badge { 
+  display: inline-block; 
+  background: #f59e0b; 
+  color: white; 
+  padding: 4px 12px; 
+  border-radius: 6px; 
+  font-size: 12px; 
+  font-weight: 600; 
+  margin-left: 8px;
+}
+.subtitle {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 1.5rem;
+}
+.card { 
+  background: white; 
+  border-radius: 12px; 
+  padding: 1.5rem; 
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.form-row { 
+  display: grid; 
+  grid-template-columns: 1fr 1fr; 
+  gap: 1rem; 
+  margin-bottom: 1rem;
+}
+label { 
+  display: block; 
+  font-size: 14px; 
+  color: #555; 
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+input, select { 
+  width: 100%; 
+  padding: 10px 12px; 
+  border: 1px solid #ddd; 
+  border-radius: 8px; 
+  font-size: 14px;
+  background: white;
+  color: #333;
+  transition: border-color 0.2s;
+}
+input:focus, select:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+.note { 
+  font-size: 12px; 
+  color: #888; 
+  margin-top: 6px; 
+  line-height: 1.4;
+}
+button { 
+  width: 100%; 
+  padding: 12px; 
+  border: none;
+  background: #3b82f6; 
+  color: white; 
+  border-radius: 8px; 
+  cursor: pointer; 
+  font-size: 15px; 
+  font-weight: 600;
+  margin-top: 1rem;
+  transition: background 0.2s;
+}
+button:hover { 
+  background: #2563eb; 
+}
+.speed-display { 
+  background: #f9fafb; 
+  border-radius: 8px; 
+  padding: 1rem; 
+  margin-top: 1rem;
+}
+.speed-val { 
+  font-size: 20px; 
+  font-weight: 600; 
+  color: #1a1a1a;
+}
+.speed-note { 
+  font-size: 13px; 
+  color: #666; 
+  margin-top: 4px;
+}
+.metric-grid { 
+  display: grid; 
+  grid-template-columns: repeat(3, 1fr); 
+  gap: 12px; 
+  margin-bottom: 1.5rem;
+}
+.metric { 
+  background: #f9fafb; 
+  border-radius: 8px; 
+  padding: 1rem;
+  text-align: center;
+}
+.metric-label { 
+  font-size: 12px; 
+  color: #666; 
+  margin-bottom: 6px;
+}
+.metric-val { 
+  font-size: 24px; 
+  font-weight: 600; 
+  color: #1a1a1a;
+}
+.metric-unit {
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+.result-box { 
+  background: #f0fdf4; 
+  border-radius: 12px; 
+  border-left: 4px solid #10b981; 
+  padding: 1.5rem; 
+  margin-bottom: 1rem;
+}
+.result-title { 
+  font-size: 13px; 
+  color: #065f46; 
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.result-big { 
+  font-size: 32px; 
+  font-weight: 600; 
+  color: #047857;
+}
+.result-sub { 
+  font-size: 13px; 
+  color: #059669; 
+  margin-top: 8px;
+}
+.result-final { 
+  background: #fffbeb; 
+  border-radius: 12px; 
+  border-left: 4px solid #f59e0b; 
+  padding: 1.5rem; 
+  margin-bottom: 1rem;
+}
+.result-final-big { 
+  font-size: 32px; 
+  font-weight: 600; 
+  color: #d97706;
+}
+#result { display: none; }
+.info-box {
+  background: #eff6ff;
+  border-left: 3px solid #3b82f6;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 1rem;
+  font-size: 13px;
+  color: #1e40af;
+}
+.footer {
+  text-align: center;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+  color: #888;
+  font-size: 12px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>
+    Kalkulator Laser Flat Cutting
+    <span class="buffer-badge">BUFFER 38%</span>
+  </h1>
+  <div class="subtitle">Estimasi waktu cutting untuk plat datar (flat metal sheet) — Offline version</div>
+
+  <div class="card">
+    <div class="form-row">
+      <div>
+        <label>Power laser (W)</label>
+        <select id="power" onchange="updateSpeed()">
+          <option value="1500">1500 W</option>
+          <option value="3000">3000 W</option>
+          <option value="6000" selected>6000 W</option>
+          <option value="12000">12000 W</option>
+        </select>
+      </div>
+      <div>
+        <label>Material</label>
+        <select id="material" onchange="updateSpeed()">
+          <option value="Carbon Steel" selected>Carbon Steel</option>
+          <option value="Stainless Steel">Stainless Steel</option>
+          <option value="Aluminum">Aluminum</option>
+          <option value="Brass">Brass</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label>Tebal material (mm)</label>
+        <input type="number" id="thick" value="0.7" min="0.1" step="0.1" oninput="updateSpeed()">
+      </div>
+      <div>
+        <label>Perimeter (mm)</label>
+        <input type="number" id="perim" value="" placeholder="e.g. 844" min="1">
+        <div class="note">Total panjang semua garis potong (dari CAD)</div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label>Jumlah piercing</label>
+        <input type="number" id="pierce-count" value="" placeholder="e.g. 1" min="0">
+        <div class="note">Setiap kontur tertutup = 1 piercing</div>
+      </div>
+      <div>
+        <label>Qty pcs</label>
+        <input type="number" id="qty" value="1" min="1">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div>
+        <label>Piercing time per hole (detik)</label>
+        <input type="number" id="pierce-time" value="1" min="0.1" step="0.5">
+      </div>
+      <div>
+        <label>Travel speed (m/min)</label>
+        <input type="number" id="travel-speed" value="60" min="1">
+      </div>
+    </div>
+
+    <div class="speed-display">
+      <label style="margin-bottom:8px">Kecepatan potong terdeteksi (minimum)</label>
+      <div class="speed-val" id="speed-val">-</div>
+      <div class="speed-note" id="speed-note">Pilih material & tebal</div>
+    </div>
+
+    <button onclick="calc()">🧮 Hitung Waktu Cutting</button>
+  </div>
+
+  <div id="result">
+    <div class="card">
+      <h3 style="font-size:16px;font-weight:600;margin-bottom:1rem">Breakdown Waktu</h3>
+      <div class="metric-grid">
+        <div class="metric">
+          <div class="metric-label">Cutting</div>
+          <div class="metric-val" id="r-cut">-</div>
+          <div class="metric-unit">detik</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Piercing</div>
+          <div class="metric-val" id="r-pierce">-</div>
+          <div class="metric-unit">detik</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Travel</div>
+          <div class="metric-val" id="r-travel">-</div>
+          <div class="metric-unit">detik</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="result-box">
+      <div class="result-title">Waktu murni (1 pcs)</div>
+      <div class="result-big" id="r-total-1">-</div>
+      <div class="result-sub" id="r-break-1">-</div>
+    </div>
+
+    <div class="result-final">
+      <div class="result-title" style="color:#92400e">✅ Final dengan safety buffer (+38%)</div>
+      <div class="result-final-big" id="r-final-1">-</div>
+      <div class="result-sub" style="color:#b45309" id="r-final-sub-1">-</div>
+    </div>
+
+    <div class="result-box" id="r-all-box" style="display:none;background:#dbeafe;border-color:#3b82f6">
+      <div class="result-title" style="color:#1e40af" id="r-all-label">-</div>
+      <div class="result-big" style="color:#1d4ed8" id="r-total-all">-</div>
+      <div class="result-sub" style="color:#2563eb" id="r-break-all">-</div>
+    </div>
+
+    <div class="result-final" id="r-final-all-box" style="display:none;background:#fef3c7;border-color:#f59e0b">
+      <div class="result-title" style="color:#92400e" id="r-final-all-label">-</div>
+      <div class="result-final-big" style="color:#d97706" id="r-final-all">-</div>
+      <div class="result-sub" style="color:#b45309" id="r-final-sub-all">-</div>
+    </div>
+
+    <div class="info-box">
+      ℹ️ Kecepatan = minimum dari tabel (worst-case). Tidak termasuk: setup time, kerf compensation, cornering slowdown. 
+      Buffer 38% mencakup 90% scenarios normal.
+    </div>
+  </div>
+
+  <div class="footer">
+    Laser Cutting Calculator v1.0 — Offline Version — Buffer 38% Fixed<br>
+    Works 100% offline — No internet required
+  </div>
+</div>
+
+<script>
+const BUFFER_PERCENT = 38;
+
+const DB = {
+  "6000": {
+    "Carbon Steel": {"1":30,"2":30,"3":15,"4":9,"6":6,"8":2.2,"10":2,"12":1.6,"14":1.2,"16":1,"20":0.6,"25":0.5,"30":0.25},
+    "Stainless Steel": {"1":30,"2":30,"3":15,"4":9,"6":6,"8":3,"10":1.5,"12":1,"16":0.6,"18":0.2},
+    "Aluminum": {"1":30,"2":30,"3":20,"4":8,"6":4,"8":2,"10":1.5,"12":1,"14":0.6,"16":0.2},
+    "Brass": {"1":20,"2":20,"3":7,"4":8,"6":3,"8":1.8,"10":1.3,"12":0.9,"14":0.5}
+  },
+  "3000": {
+    "Carbon Steel": {"1":30,"2":30,"3":15,"4":9,"6":6,"8":1.95,"10":1.5,"12":1.1,"14":0.8,"16":0.65,"20":0.6,"22":0.6},
+    "Stainless Steel": {"1":30,"2":30,"3":15,"4":9,"6":6,"8":1.3,"10":0.8,"12":0.55},
+    "Aluminum": {"1":25,"2":25,"3":20,"4":8,"6":4,"8":2,"10":1.5,"12":1},
+    "Brass": {"1":20,"2":20,"3":7,"4":8,"6":3,"8":1.8,"10":1.3,"12":0.9}
+  },
+  "1500": {
+    "Carbon Steel": {"1":22.5,"2":4.5,"3":2.95,"4":2.7,"6":1.8,"8":1.15,"10":0.95,"12":0.75,"14":0.65,"16":0.55},
+    "Stainless Steel": {"1":25,"2":12.5,"3":5,"4":2.25,"6":0.95},
+    "Aluminum": {"1":11.5,"2":3,"3":1.25,"4":0.75},
+    "Brass": {"1":11.5,"2":3,"3":1.25}
+  },
+  "12000": {
+    "Carbon Steel": {"1":30,"2":30,"3":20,"4":15,"6":10,"8":7,"10":6,"12":1.6,"14":1.6,"16":1.5,"20":1.3,"25":0.7,"30":0.4,"35":0.3,"40":0.1},
+    "Stainless Steel": {"1":30,"2":30,"3":20,"4":15,"6":10,"8":7,"10":6,"12":5,"16":2,"20":1.2,"25":0.7,"30":0.3},
+    "Aluminum": {"1":30,"2":30,"3":20,"4":13,"6":10,"8":6,"10":4,"12":2,"16":1.3,"20":0.8,"25":0.5,"30":0.2},
+    "Brass": {"1":20,"2":20,"3":18,"4":12,"6":8,"8":5,"10":4,"12":1.8,"14":1,"16":0.4}
+  }
+};
+
+function getSpeed(pw, mat, th) {
+  const tbl = DB[pw]?.[mat];
+  if (!tbl) return null;
+  const t = parseFloat(th);
+  const keys = Object.keys(tbl).map(Number).sort((a,b)=>a-b);
+  if (t < keys[0]) return tbl[keys[0]];
+  if (tbl[t]) return tbl[t];
+  const lo = keys.filter(k => k < t).pop();
+  const hi = keys.filter(k => k > t)[0];
+  if (!lo && !hi) return null;
+  if (!hi) return tbl[lo];
+  const interp = tbl[lo] + (tbl[hi] - tbl[lo]) * (t - lo) / (hi - lo);
+  return parseFloat(interp.toFixed(2));
+}
+
+function fmt(s) {
+  if (s < 60) return s.toFixed(1) + ' s';
+  const m = Math.floor(s / 60);
+  return m + 'm ' + (s % 60).toFixed(0) + 's';
+}
+
+function updateSpeed() {
+  const pw = document.getElementById('power').value;
+  const mat = document.getElementById('material').value;
+  const th = parseFloat(document.getElementById('thick').value) || 0.7;
+  const sp = getSpeed(pw, mat, th);
+  if (sp) {
+    document.getElementById('speed-val').textContent = sp + ' m/min';
+    document.getElementById('speed-note').textContent = `${mat} ${th}mm @ ${pw}W (minimum dari tabel)`;
+  } else {
+    document.getElementById('speed-val').textContent = 'Tidak tersedia';
+    document.getElementById('speed-note').textContent = 'Kombinasi tidak ada di tabel';
+  }
+}
+
+function calc() {
+  const perim = parseFloat(document.getElementById('perim').value);
+  const holes = parseFloat(document.getElementById('pierce-count').value);
+  
+  if (!perim || isNaN(holes)) {
+    alert('Perimeter dan jumlah piercing harus diisi!');
+    return;
+  }
+  
+  const thick = parseFloat(document.getElementById('thick').value) || 0.7;
+  const pw = document.getElementById('power').value;
+  const mat = document.getElementById('material').value;
+  const qty = parseInt(document.getElementById('qty').value) || 1;
+  const pieTime = parseFloat(document.getElementById('pierce-time').value) || 1;
+  const travelSpeed = parseFloat(document.getElementById('travel-speed').value) || 60;
+
+  const speed = getSpeed(pw, mat, thick);
+  if (!speed) {
+    alert('Speed tidak ditemukan. Gunakan power lebih tinggi.');
+    return;
+  }
+
+  const speedMmS = speed * 1000 / 60;
+  const cutTime = perim / speedMmS;
+  const pierceTime = holes * pieTime;
+  const travelTime = (holes > 0 ? holes : 1) * (100 / (travelSpeed * 1000 / 60));
+  const total1 = cutTime + pierceTime + travelTime;
+  const final1 = total1 * (1 + BUFFER_PERCENT/100);
+  const totalAll = total1 * qty;
+  const finalAll = totalAll * (1 + BUFFER_PERCENT/100);
+
+  document.getElementById('r-cut').textContent = cutTime.toFixed(1);
+  document.getElementById('r-pierce').textContent = pierceTime.toFixed(1);
+  document.getElementById('r-travel').textContent = travelTime.toFixed(2);
+  document.getElementById('r-total-1').textContent = fmt(total1);
+  document.getElementById('r-break-1').textContent = `Cut ${cutTime.toFixed(1)}s + Pierce ${pierceTime.toFixed(1)}s + Travel ${travelTime.toFixed(2)}s`;
+  document.getElementById('r-final-1').textContent = fmt(final1);
+  document.getElementById('r-final-sub-1').textContent = `${total1.toFixed(1)}s + ${BUFFER_PERCENT}% = ${final1.toFixed(1)}s`;
+
+  if (qty > 1) {
+    document.getElementById('r-all-box').style.display = 'block';
+    document.getElementById('r-final-all-box').style.display = 'block';
+    document.getElementById('r-all-label').textContent = `Waktu murni (${qty} pcs)`;
+    document.getElementById('r-total-all').textContent = fmt(totalAll);
+    document.getElementById('r-break-all').textContent = `${qty} × ${total1.toFixed(1)}s`;
+    document.getElementById('r-final-all-label').textContent = `Final untuk ${qty} pcs (+${BUFFER_PERCENT}%)`;
+    document.getElementById('r-final-all').textContent = fmt(finalAll);
+    document.getElementById('r-final-sub-all').textContent = `${totalAll.toFixed(1)}s + ${BUFFER_PERCENT}% = ${finalAll.toFixed(1)}s`;
+  } else {
+    document.getElementById('r-all-box').style.display = 'none';
+    document.getElementById('r-final-all-box').style.display = 'none';
+  }
+
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('result').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+updateSpeed();
+</script>
+
+</body>
+</html>
