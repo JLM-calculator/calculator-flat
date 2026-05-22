@@ -733,7 +733,7 @@ async function processImageOCR(file) {
       console.log('[OCR] Worker initialized successfully');
     } catch (initError) {
       console.error('[OCR] Worker initialization failed:', initError);
-      statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR initialization failed: ' + initError.message + '</span>';
+      statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR initialization failed: ' + (initError.message || JSON.stringify(initError)) + '</span>';
       return;
     }
     
@@ -742,18 +742,28 @@ async function processImageOCR(file) {
     
     console.log('[OCR] Starting recognition...');
     
-    // Recognize with Tesseract v3
+    // Convert File to base64 URL for Tesseract v4 compatibility
+    const imageURL = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.onerror = e => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+    
+    console.log('[OCR] File converted to base64, starting recognition...');
+    
+    // Recognize with Tesseract v4
     let result;
     try {
-      result = await worker.recognize(file);
-      console.log('[OCR] Recognition complete (v3)');
+      result = await worker.recognize(imageURL);
+      console.log('[OCR] Recognition complete (v4)');
     } catch (recognizeError) {
       console.error('[OCR] Recognition failed:', recognizeError);
-      statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR recognition failed: ' + recognizeError.message + '</span>';
+      statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR recognition failed: ' + (recognizeError.message || JSON.stringify(recognizeError)) + '</span>';
       return;
     }
     
-    // Extract text from v3 result structure
+    // Extract text from v4 result structure
     const text = result.data.text;
     console.log('[OCR] Raw Text:', text);
     
