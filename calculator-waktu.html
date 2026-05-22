@@ -261,10 +261,24 @@ button:hover {
     </div>
     <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleUpload(event)">
     
+    <!-- OCR STATUS INDICATOR -->
+    <div id="ocr-status" style="
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      background: #dbeafe;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #0c447c;
+    "></div>
+    
+    <!-- OCR CONFIRMATION SECTION -->
+    <div id="ocr-confirm-section" style="display: none;"></div>
+    
     <!-- UNIT INPUT SECTION (Hidden until image uploaded) -->
     <div id="unit-section" style="display:none;margin-top:16px;padding:16px;background:#f0fdf4;border:0.5px solid #86efac;border-radius:8px">
-      <label style="font-size:14px;font-weight:600;color:#059669;margin-bottom:12px;display:block">📏 Satuan Ukuran Gambar</label>
-      <p style="font-size:13px;color:#666;margin-bottom:12px">Pilih satuan yang digunakan dalam dimensi gambar Anda:</p>
+      <label style="font-size:14px;font-weight:600;color:#059669;margin-bottom:12px;display:block">📏 Satuan Ukuran Gambar (Optional)</label>
+      <p style="font-size:13px;color:#666;margin-bottom:12px">OCR sudah detect dimensi. Jika hasil tidak akurat, pilih satuan untuk konversi manual:</p>
       
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px;background:white;border:0.5px solid #ddd;border-radius:6px;font-weight:500;font-size:13px">
@@ -293,9 +307,9 @@ button:hover {
       <div>
         <label>Power laser (W)</label>
         <select id="power" onchange="updateSpeed()">
-          <option value="1500">1500 W</option>
+          <option value="1500" selected>1500 W</option>
           <option value="3000">3000 W</option>
-          <option value="6000" selected>6000 W</option>
+          <option value="6000">6000 W</option>
           <option value="12000">12000 W</option>
         </select>
       </div>
@@ -499,7 +513,7 @@ function confirmUnit() {
   }
   
   // Auto-fill the form
-  document.getElementById('w_perim').value = Math.round(convertedPerimeter);
+  document.getElementById('perim').value = Math.round(convertedPerimeter);
   
   // Show notification
   const notif = document.createElement('div');
@@ -519,7 +533,7 @@ function confirmUnit() {
   document.getElementById('unit-section').style.display = 'none';
   
   // Focus to perimeter field
-  document.getElementById('w_perim').focus();
+  document.getElementById('perim').focus();
 }
 
 function getSpeed(pw, mat, th) {
@@ -640,6 +654,311 @@ function lanjutKeHarga() {
 }
 
 updateSpeed();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TESSERACT.JS OCR IMPLEMENTATION — AUTO-EXTRACT DIMENSIONS FROM IMAGE
+// ═══════════════════════════════════════════════════════════════════════════
+
+let ocrWorker = null;
+
+async function initOCR() {
+  if (ocrWorker) return ocrWorker;
+  
+  const statusDiv = document.getElementById('ocr-status');
+  
+  // Check if Tesseract is loaded
+  if (typeof Tesseract === 'undefined') {
+    const error = 'Tesseract.js library not loaded. Please refresh the page.';
+    console.error('[OCR]', error);
+    if (statusDiv) {
+      statusDiv.innerHTML = '<span style="color:#ef4444">❌ ' + error + '</span>';
+    }
+    throw new Error(error);
+  }
+  
+  console.log('[OCR] Tesseract v4 available, creating worker...');
+  
+  try {
+    // Tesseract v4 API for GitHub Pages (HTTPS)
+    const worker = await Tesseract.createWorker('eng', 1, {
+      logger: m => {
+        console.log('[Tesseract v4]', m);
+        
+        // Update UI based on progress
+        if (statusDiv && m.status) {
+          const percent = Math.round((m.progress || 0) * 100);
+          
+          if (m.status === 'loading tesseract core') {
+            statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Loading OCR engine... ' + percent + '%</span>';
+          } else if (m.status === 'initializing tesseract') {
+            statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Initializing... ' + percent + '%</span>';
+          } else if (m.status === 'loading language traineddata') {
+            statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Loading language data... ' + percent + '%</span>';
+          } else if (m.status === 'initializing api') {
+            statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Starting OCR... ' + percent + '%</span>';
+          } else if (m.status === 'recognizing text') {
+            statusDiv.innerHTML = '<span style="color:#3b82f6">🔍 Processing image... ' + percent + '%</span>';
+          }
+        }
+      }
+    });
+    
+    console.log('[OCR] Worker created successfully (v4 for GitHub Pages)');
+    ocrWorker = worker;
+    return worker;
+  } catch (error) {
+    console.error('[OCR] Failed to initialize OCR worker:', error);
+    if (statusDiv) {
+      statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR initialization failed: ' + error.message + '</span>';
+    }
+    throw error;
+  }
+}
+
+async function processImageOCR(file) {
+  const statusDiv = document.getElementById('ocr-status');
+  const confirmSection = document.getElementById('ocr-confirm-section');
+  
+  try {
+    // Show loading
+    statusDiv.style.display = 'block';
+    statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Initializing OCR... (first time may take 30-60s)</span>';
+    
+    console.log('[OCR] Starting processImageOCR with file:', file.name, file.type, file.size);
+    
+    // Initialize worker
+    let worker;
+    try {
+      worker = await initOCR();
+      console.log('[OCR] Worker initialized successfully');
+    } catch (initError) {
+      console.error('[OCR] Worker initialization failed:', initError);
+      statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR initialization failed: ' + initError.message + '</span>';
+      return;
+    }
+    
+    // Process image
+    statusDiv.innerHTML = '<span style="color:#3b82f6">🔍 Processing image... please wait</span>';
+    
+    console.log('[OCR] Starting recognition...');
+    
+    // Recognize with Tesseract v3
+    let result;
+    try {
+      result = await worker.recognize(file);
+      console.log('[OCR] Recognition complete (v3)');
+    } catch (recognizeError) {
+      console.error('[OCR] Recognition failed:', recognizeError);
+      statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR recognition failed: ' + recognizeError.message + '</span>';
+      return;
+    }
+    
+    // Extract text from v3 result structure
+    const text = result.data.text;
+    console.log('[OCR] Raw Text:', text);
+    
+    // Parse dimensions
+    const dimensions = extractDimensions(text);
+    console.log('Extracted Dimensions:', dimensions);
+    
+    if (!dimensions || dimensions.numbers.length < 2) {
+      statusDiv.innerHTML = '<span style="color:#f59e0b">⚠️ Could not detect dimensions. Please input manually.</span>';
+      return;
+    }
+    
+    // Calculate perimeter estimates
+    const estimates = calculatePerimeterEstimates(dimensions);
+    console.log('Perimeter Estimates:', estimates);
+    
+    // Show confirmation UI
+    showOCRConfirmation(dimensions, estimates);
+    
+    statusDiv.innerHTML = '<span style="color:#10b981">✓ OCR completed! Review detected dimensions below.</span>';
+    
+  } catch (error) {
+    console.error('[OCR] Main catch - Error:', error);
+    console.error('[OCR] Error stack:', error.stack);
+    statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR failed: ' + error.message + '<br><small>Check console (F12) for details. You can input manually below.</small></span>';
+  }
+}
+
+function extractDimensions(text) {
+  // Find all numbers (including decimals)
+  const numberMatches = text.match(/\d+\.?\d*/g);
+  
+  if (!numberMatches || numberMatches.length === 0) {
+    return null;
+  }
+  
+  // Convert to numbers and filter realistic values (0.1mm - 10000mm)
+  const numbers = numberMatches
+    .map(n => parseFloat(n))
+    .filter(n => n >= 0.1 && n <= 10000)
+    .sort((a, b) => b - a); // Sort descending
+  
+  // Find radius values (R3, R8, etc)
+  const radiusMatches = text.match(/R\s*(\d+)/gi);
+  const radii = radiusMatches ? radiusMatches.map(r => r.match(/\d+/)[0]) : [];
+  
+  return {
+    numbers: numbers,
+    radii: radii,
+    rawText: text
+  };
+}
+
+function calculatePerimeterEstimates(dimensions) {
+  const nums = dimensions.numbers;
+  
+  if (nums.length < 2) {
+    return null;
+  }
+  
+  // Assume largest 2 numbers are outer dimensions
+  const width = nums[0];
+  const height = nums[1];
+  
+  // Calculate outer perimeter
+  const outerPerimeter = 2 * (width + height);
+  
+  // Estimate inner features (slots/holes) from remaining dimensions
+  let innerPerimeter = 0;
+  if (nums.length > 2) {
+    // Simple heuristic: sum of remaining numbers as approximate inner perimeter
+    // This is rough estimation - user should verify!
+    const innerDims = nums.slice(2);
+    innerPerimeter = innerDims.reduce((sum, n) => sum + n, 0) * 2; // multiply by 2 as rough estimate
+  }
+  
+  // Add radius arc lengths
+  let radiusLength = 0;
+  if (dimensions.radii.length > 0) {
+    dimensions.radii.forEach(r => {
+      radiusLength += parseFloat(r) * 1.57; // Quarter circle arc ≈ r × π/2
+    });
+  }
+  
+  return {
+    outer: Math.round(outerPerimeter),
+    inner: Math.round(innerPerimeter),
+    radius: Math.round(radiusLength),
+    total: Math.round(outerPerimeter + innerPerimeter + radiusLength),
+    width: width,
+    height: height,
+    confidence: nums.length >= 4 ? 'medium' : 'low'
+  };
+}
+
+function showOCRConfirmation(dimensions, estimates) {
+  const confirmSection = document.getElementById('ocr-confirm-section');
+  
+  const html = `
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:1rem;margin-top:1rem">
+      <div style="font-size:14px;font-weight:600;color:#047857;margin-bottom:12px">
+        📊 Detected Dimensions (Please verify!)
+      </div>
+      
+      <div style="background:white;padding:12px;border-radius:6px;margin-bottom:12px">
+        <div style="font-size:13px;margin-bottom:8px">
+          <strong>Main dimensions:</strong> ${estimates.width} × ${estimates.height} mm
+        </div>
+        <div style="font-size:13px;margin-bottom:8px">
+          <strong>All detected numbers:</strong> ${dimensions.numbers.slice(0, 10).join(', ')}${dimensions.numbers.length > 10 ? '...' : ''} mm
+        </div>
+        ${dimensions.radii.length > 0 ? `
+        <div style="font-size:13px;margin-bottom:8px">
+          <strong>Detected radius:</strong> ${dimensions.radii.join(', ')}
+        </div>
+        ` : ''}
+      </div>
+      
+      <div style="background:white;padding:12px;border-radius:6px;margin-bottom:12px">
+        <div style="font-size:13px;margin-bottom:6px"><strong>Estimated Perimeter:</strong></div>
+        <div style="font-size:12px;color:#666;margin-bottom:4px">• Outer edge: ~${estimates.outer} mm</div>
+        ${estimates.inner > 0 ? `<div style="font-size:12px;color:#666;margin-bottom:4px">• Inner features: ~${estimates.inner} mm</div>` : ''}
+        ${estimates.radius > 0 ? `<div style="font-size:12px;color:#666;margin-bottom:4px">• Radius arcs: ~${estimates.radius} mm</div>` : ''}
+        <div style="font-size:14px;font-weight:600;color:#047857;margin-top:8px">
+          → Total: ~${estimates.total} mm
+        </div>
+        <div style="font-size:11px;color:#888;margin-top:6px">
+          ⚠️ This is an estimate. Please verify and adjust if needed.
+        </div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button onclick="applyOCRResult(${estimates.total})" style="padding:10px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+          ✓ Use This Value
+        </button>
+        <button onclick="clearOCRResult()" style="padding:10px;background:#6b7280;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+          ✕ Input Manually
+        </button>
+      </div>
+    </div>
+  `;
+  
+  confirmSection.innerHTML = html;
+  confirmSection.style.display = 'block';
+}
+
+function applyOCRResult(perimeter) {
+  document.getElementById('perim').value = perimeter;
+  document.getElementById('ocr-confirm-section').style.display = 'none';
+  document.getElementById('ocr-status').innerHTML = '<span style="color:#10b981">✓ OCR result applied to perimeter field</span>';
+  
+  // Scroll to perimeter field
+  document.getElementById('perim').focus();
+  document.getElementById('perim').scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+
+function clearOCRResult() {
+  document.getElementById('ocr-confirm-section').style.display = 'none';
+  document.getElementById('ocr-status').innerHTML = '<span style="color:#666">Manual input mode. Enter perimeter below.</span>';
+  document.getElementById('perim').focus();
+}
+
+// Modify existing handleUpload to include OCR
+const originalHandleUpload = handleUpload;
+function handleUploadWithOCR(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const preview = document.getElementById('preview');
+    preview.src = ev.target.result;
+    preview.style.display = 'block';
+    
+    const zone = document.getElementById('upload-zone');
+    zone.classList.add('has-file');
+    
+    // Show unit section
+    document.getElementById('unit-section').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+  
+  // Run OCR in background
+  processImageOCR(file);
+}
+
+// Override handleUpload
+handleUpload = handleUploadWithOCR;
+
+</script>
+
+<!-- Tesseract.js Library v4 (for HTTPS/GitHub Pages) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+<script>
+// Wait for Tesseract to be available
+window.addEventListener('load', function() {
+  if (typeof Tesseract !== 'undefined') {
+    console.log('[OCR] Tesseract.js v4 loaded successfully');
+    console.log('[OCR] Ready for use on GitHub Pages');
+  } else {
+    console.error('[OCR] Tesseract failed to load!');
+  }
+});
 </script>
 
 </body>
