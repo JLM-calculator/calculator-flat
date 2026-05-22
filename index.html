@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laser Cutting Tools — Kalkulator HPP & Estimasi</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+.container { 
+  max-width: 800px; 
+  width: 100%;
+}
+.header {
+  text-align: center;
+  color: white;
+  margin-bottom: 3rem;
+}
+.header h1 {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+.header p {
+  font-size: 16px;
+  opacity: 0.9;
+}
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.tool-card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  transition: transform 0.3s, box-shadow 0.3s;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+.tool-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 50px rgba(0,0,0,0.25);
+}
+.tool-icon {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin-bottom: 1.5rem;
+}
+.tool-card.waktu .tool-icon {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+.tool-card.harga .tool-icon {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+.tool-title {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: #1a1a1a;
+}
+.tool-desc {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.tool-btn:hover {
+  background: #e5e5e5;
+}
+.workflow {
+  background: rgba(255,255,255,0.95);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  margin-bottom: 2rem;
+}
+.workflow-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.workflow-steps {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #f0f0f0;
+  border-radius: 20px;
+  font-size: 14px;
+  color: #555;
+}
+.step-num {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+.arrow {
+  font-size: 20px;
+  color: #999;
+}
+.footer {
+  text-align: center;
+  color: white;
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 2rem;
+}
+.badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+  color: white;
+}
+@media (max-width: 640px) {
+  .header h1 { font-size: 28px; }
+  .tools-grid { grid-template-columns: 1fr; }
+  .workflow-steps { flex-direction: column; align-items: flex-start; }
+  .arrow { transform: rotate(90deg); }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>🔧 Laser Cutting Tools</h1>
+    <p>Sistem estimasi waktu & harga untuk laser cutting flat metal sheet</p>
+  </div>
+
+  <div class="workflow">
+    <div class="workflow-title">
+      💡 Workflow Recommended
+    </div>
+    <div class="workflow-steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <span>Hitung Waktu Cutting</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <span>Hitung HPP & Harga Jual</span>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <span>Quotation Ready!</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tools-grid">
+    <!-- Tool 1: Waktu -->
+    <a href="calculator-waktu.html" class="tool-card waktu">
+      <div class="tool-icon">⏱️</div>
+      <div class="tool-title">
+        Kalkulator Waktu Cutting
+        <span class="badge" style="background:#f5576c">STEP 1</span>
+      </div>
+      <div class="tool-desc">
+        Estimasi waktu cutting untuk plat datar (flat sheet metal) berdasarkan material, tebal, perimeter, dan piercing. Buffer safety 38% included.
+      </div>
+      <div class="tool-btn">
+        Mulai Hitung Waktu
+        <span>→</span>
+      </div>
+    </a>
+
+    <!-- Tool 2: Harga -->
+    <a href="calculator-harga.html" class="tool-card harga">
+      <div class="tool-icon">💰</div>
+      <div class="tool-title">
+        Kalkulator HPP & Harga Jual
+        <span class="badge" style="background:#00f2fe">STEP 2</span>
+      </div>
+      <div class="tool-desc">
+        Hitung HPP (Harga Pokok Produksi) dan harga jual berdasarkan waktu cutting, gas, consumable, margin, dan biaya material. Auto-load dari Step 1.
+      </div>
+      <div class="tool-btn">
+        Mulai Hitung Harga
+        <span>→</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="footer">
+    Laser Cutting Calculator Suite v1.0 — Offline Ready<br>
+    Works 100% offline — No internet required
+  </div>
+</div>
+
+</body>
+</html>
