@@ -504,7 +504,7 @@ window.addEventListener('DOMContentLoaded', function() {
     try {
       const data = JSON.parse(stored);
       
-      const waktuSec = Math.round(data.waktu);
+      const waktuSec = Math.ceil(data.waktu);  // Round UP: 2.9 → 3
       const pierceCount = data.piercing || 0;
       
       // Show notification bar with auto-filled data
@@ -535,16 +535,16 @@ window.addEventListener('DOMContentLoaded', function() {
         
         // Switch to "detik" input mode
         met = 'detik';
-        document.querySelectorAll('.mbtn').forEach(b => b.classList.remove('on'));
-        const detikBtn = Array.from(document.querySelectorAll('.mbtn')).find(b => b.querySelector('strong').textContent === 'Detik');
+        document.querySelectorAll('.sbtn').forEach(b => b.classList.remove('on'));
+        const detikBtn = Array.from(document.querySelectorAll('.sbtn')).find(b => b.textContent.includes('Detik'));
         if (detikBtn) detikBtn.classList.add('on');
         
         // Fill durasi cutting detik — AUTO FILLED
         document.getElementById('v-detik').value = waktuSec;
-        document.getElementById('f-detik').style.display = 'flex';
-        document.getElementById('f-menit').style.display = 'none';
-        document.getElementById('f-m2').style.display = 'none';
-        document.getElementById('f-cm2').style.display = 'none';
+        document.getElementById('i-detik').style.display = 'flex';
+        document.getElementById('i-menit').style.display = 'none';
+        document.getElementById('i-m2').style.display = 'none';
+        document.getElementById('i-cm2').style.display = 'none';
         
         // Highlight the auto-filled fields to show they came from calculator waktu
         const detikInput = document.getElementById('v-detik');
