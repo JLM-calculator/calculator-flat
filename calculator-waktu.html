@@ -666,129 +666,81 @@ async function initOCR() {
   
   const statusDiv = document.getElementById('ocr-status');
   
-  // Check if Tesseract is loaded
   if (typeof Tesseract === 'undefined') {
-    const error = 'Tesseract.js library not loaded. Please refresh the page.';
-    console.error('[OCR]', error);
-    if (statusDiv) {
-      statusDiv.innerHTML = '<span style="color:#ef4444">❌ ' + error + '</span>';
-    }
-    throw new Error(error);
+    throw new Error('Tesseract.js not loaded. Check internet connection.');
   }
   
-  console.log('[OCR] Tesseract v4 available, creating worker...');
+  console.log('[OCR] Creating worker...');
+  statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Loading OCR engine...</span>';
   
-  try {
-    // Tesseract v4 API for GitHub Pages (HTTPS)
-    const worker = await Tesseract.createWorker('eng', 1, {
-      logger: m => {
-        console.log('[Tesseract v4]', m);
-        
-        // Update UI based on progress
-        if (statusDiv && m.status) {
-          const percent = Math.round((m.progress || 0) * 100);
-          
-          if (m.status === 'loading tesseract core') {
-            statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Loading OCR engine... ' + percent + '%</span>';
-          } else if (m.status === 'initializing tesseract') {
-            statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Initializing... ' + percent + '%</span>';
-          } else if (m.status === 'loading language traineddata') {
-            statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Loading language data... ' + percent + '%</span>';
-          } else if (m.status === 'initializing api') {
-            statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Starting OCR... ' + percent + '%</span>';
-          } else if (m.status === 'recognizing text') {
-            statusDiv.innerHTML = '<span style="color:#3b82f6">🔍 Processing image... ' + percent + '%</span>';
-          }
-        }
-      }
-    });
-    
-    console.log('[OCR] Worker created successfully (v4 for GitHub Pages)');
-    ocrWorker = worker;
-    return worker;
-  } catch (error) {
-    console.error('[OCR] Failed to initialize OCR worker:', error);
-    if (statusDiv) {
-      statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR initialization failed: ' + error.message + '</span>';
+  // Tesseract v4 correct initialization sequence
+  const worker = await Tesseract.createWorker({
+    logger: m => {
+      console.log('[Tesseract]', m);
+      if (!statusDiv) return;
+      const pct = Math.round((m.progress || 0) * 100);
+      if (m.status === 'loading tesseract core')
+        statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Loading engine... ' + pct + '%</span>';
+      else if (m.status === 'loading language traineddata')
+        statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Loading language... ' + pct + '%</span>';
+      else if (m.status === 'recognizing text')
+        statusDiv.innerHTML = '<span style="color:#3b82f6">🔍 Reading image... ' + pct + '%</span>';
     }
-    throw error;
-  }
+  });
+  
+  await worker.loadLanguage('eng');
+  await worker.initialize('eng');
+  
+  console.log('[OCR] Worker ready');
+  ocrWorker = worker;
+  return worker;
 }
 
 async function processImageOCR(file) {
   const statusDiv = document.getElementById('ocr-status');
   const confirmSection = document.getElementById('ocr-confirm-section');
   
+  statusDiv.style.display = 'block';
+  statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Starting OCR... (first time ~30-60s)</span>';
+  
   try {
-    // Show loading
-    statusDiv.style.display = 'block';
-    statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Initializing OCR... (first time may take 30-60s)</span>';
+    console.log('[OCR] File:', file.name, file.type, file.size);
     
-    console.log('[OCR] Starting processImageOCR with file:', file.name, file.type, file.size);
+    // Step 1: Init worker
+    const worker = await initOCR();
     
-    // Initialize worker
-    let worker;
-    try {
-      worker = await initOCR();
-      console.log('[OCR] Worker initialized successfully');
-    } catch (initError) {
-      console.error('[OCR] Worker initialization failed:', initError);
-      statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR initialization failed: ' + (initError.message || JSON.stringify(initError)) + '</span>';
-      return;
-    }
-    
-    // Process image
-    statusDiv.innerHTML = '<span style="color:#3b82f6">🔍 Processing image... please wait</span>';
-    
-    console.log('[OCR] Starting recognition...');
-    
-    // Convert File to base64 URL for Tesseract v4 compatibility
+    // Step 2: Convert file to base64
+    statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Reading image file...</span>';
     const imageURL = await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = e => resolve(e.target.result);
-      reader.onerror = e => reject(new Error('Failed to read file'));
+      reader.onerror = () => reject(new Error('Failed to read image file'));
       reader.readAsDataURL(file);
     });
+    console.log('[OCR] File converted to base64 OK');
     
-    console.log('[OCR] File converted to base64, starting recognition...');
+    // Step 3: Recognize
+    statusDiv.innerHTML = '<span style="color:#3b82f6">🔍 Analyzing image...</span>';
+    const { data } = await worker.recognize(imageURL);
+    console.log('[OCR] Raw text:', data.text);
     
-    // Recognize with Tesseract v4
-    let result;
-    try {
-      result = await worker.recognize(imageURL);
-      console.log('[OCR] Recognition complete (v4)');
-    } catch (recognizeError) {
-      console.error('[OCR] Recognition failed:', recognizeError);
-      statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR recognition failed: ' + (recognizeError.message || JSON.stringify(recognizeError)) + '</span>';
-      return;
-    }
-    
-    // Extract text from v4 result structure
-    const text = result.data.text;
-    console.log('[OCR] Raw Text:', text);
-    
-    // Parse dimensions
-    const dimensions = extractDimensions(text);
-    console.log('Extracted Dimensions:', dimensions);
+    // Step 4: Parse dimensions
+    const dimensions = extractDimensions(data.text);
+    console.log('[OCR] Dimensions:', dimensions);
     
     if (!dimensions || dimensions.numbers.length < 2) {
       statusDiv.innerHTML = '<span style="color:#f59e0b">⚠️ Could not detect dimensions. Please input manually.</span>';
       return;
     }
     
-    // Calculate perimeter estimates
+    // Step 5: Calculate perimeter
     const estimates = calculatePerimeterEstimates(dimensions);
-    console.log('Perimeter Estimates:', estimates);
-    
-    // Show confirmation UI
     showOCRConfirmation(dimensions, estimates);
-    
     statusDiv.innerHTML = '<span style="color:#10b981">✓ OCR completed! Review detected dimensions below.</span>';
     
   } catch (error) {
-    console.error('[OCR] Main catch - Error:', error);
-    console.error('[OCR] Error stack:', error.stack);
-    statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR failed: ' + error.message + '<br><small>Check console (F12) for details. You can input manually below.</small></span>';
+    console.error('[OCR] Error:', error);
+    statusDiv.innerHTML = '<span style="color:#ef4444">❌ OCR failed: ' + (error.message || String(error)) + '</span>';
   }
 }
 
