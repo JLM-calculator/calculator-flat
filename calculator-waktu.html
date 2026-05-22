@@ -665,15 +665,10 @@ async function initOCR() {
   if (ocrWorker) return ocrWorker;
   
   const statusDiv = document.getElementById('ocr-status');
+  if (typeof Tesseract === 'undefined') throw new Error('Tesseract.js not loaded');
   
-  if (typeof Tesseract === 'undefined') {
-    throw new Error('Tesseract.js not loaded. Check internet connection.');
-  }
-  
-  console.log('[OCR] Creating worker...');
   statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Loading OCR engine...</span>';
   
-  // Tesseract v4 correct initialization sequence
   const worker = await Tesseract.createWorker({
     logger: m => {
       console.log('[Tesseract]', m);
@@ -696,10 +691,41 @@ async function initOCR() {
   return worker;
 }
 
+// Resize image to max 1200px wide/tall and return as canvas blob URL
+function prepareImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    
+    img.onload = () => {
+      const MAX = 1200;
+      let w = img.width;
+      let h = img.height;
+      
+      // Scale down if too large
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else       { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      
+      const canvas = document.createElement('canvas');
+      canvas.width  = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      
+      URL.revokeObjectURL(url);
+      console.log('[OCR] Image resized to', w, 'x', h);
+      resolve(canvas);   // pass canvas directly — Tesseract accepts canvas
+    };
+    
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Cannot load image')); };
+    img.src = url;
+  });
+}
+
 async function processImageOCR(file) {
   const statusDiv = document.getElementById('ocr-status');
-  const confirmSection = document.getElementById('ocr-confirm-section');
-  
   statusDiv.style.display = 'block';
   statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Starting OCR... (first time ~30-60s)</span>';
   
@@ -709,19 +735,14 @@ async function processImageOCR(file) {
     // Step 1: Init worker
     const worker = await initOCR();
     
-    // Step 2: Convert file to base64
-    statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Reading image file...</span>';
-    const imageURL = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = e => resolve(e.target.result);
-      reader.onerror = () => reject(new Error('Failed to read image file'));
-      reader.readAsDataURL(file);
-    });
-    console.log('[OCR] File converted to base64 OK');
+    // Step 2: Prepare image (resize via canvas)
+    statusDiv.innerHTML = '<span style="color:#3b82f6">⏳ Preparing image...</span>';
+    const canvas = await prepareImage(file);
+    console.log('[OCR] Image prepared as canvas');
     
-    // Step 3: Recognize
+    // Step 3: Recognize from canvas
     statusDiv.innerHTML = '<span style="color:#3b82f6">🔍 Analyzing image...</span>';
-    const { data } = await worker.recognize(imageURL);
+    const { data } = await worker.recognize(canvas);
     console.log('[OCR] Raw text:', data.text);
     
     // Step 4: Parse dimensions
@@ -733,7 +754,7 @@ async function processImageOCR(file) {
       return;
     }
     
-    // Step 5: Calculate perimeter
+    // Step 5: Show results
     const estimates = calculatePerimeterEstimates(dimensions);
     showOCRConfirmation(dimensions, estimates);
     statusDiv.innerHTML = '<span style="color:#10b981">✓ OCR completed! Review detected dimensions below.</span>';
