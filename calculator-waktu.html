@@ -856,15 +856,60 @@ function showOCRConfirmation(dimensions, estimates) {
       </div>
       
       <div style="background:white;padding:12px;border-radius:6px;margin-bottom:12px">
-        <div style="font-size:13px;margin-bottom:6px"><strong>Estimated Perimeter:</strong></div>
+        <div style="font-size:13px;margin-bottom:6px"><strong>Base Perimeter (outer only):</strong></div>
         <div style="font-size:12px;color:#666;margin-bottom:4px">• Outer edge: ~${estimates.outer} mm</div>
-        ${estimates.inner > 0 ? `<div style="font-size:12px;color:#666;margin-bottom:4px">• Inner features: ~${estimates.inner} mm</div>` : ''}
+        ${estimates.inner > 0 ? `<div style="font-size:12px;color:#666;margin-bottom:4px">• Inner features detected: ~${estimates.inner} mm (estimate)</div>` : ''}
         ${estimates.radius > 0 ? `<div style="font-size:12px;color:#666;margin-bottom:4px">• Radius arcs: ~${estimates.radius} mm</div>` : ''}
         <div style="font-size:14px;font-weight:600;color:#047857;margin-top:8px">
-          → Total: ~${estimates.total} mm
+          → Base Total: ~${estimates.total} mm
         </div>
-        <div style="font-size:11px;color:#888;margin-top:6px">
-          ⚠️ This is an estimate. Please verify and adjust if needed.
+      </div>
+
+      <!-- COMPLEXITY MULTIPLIER SECTION -->
+      <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;padding:12px;margin-bottom:12px">
+        <div style="font-size:13px;font-weight:600;color:#92400e;margin-bottom:8px">
+          🔧 Koreksi Kompleksitas Part (Inner Features)
+        </div>
+        <div style="font-size:12px;color:#78350f;margin-bottom:10px">
+          OCR hanya detect outer perimeter. Pilih kompleksitas untuk auto-koreksi inner features:
+        </div>
+        
+        <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:10px">
+          <label style="display:flex;align-items:center;gap:8px;padding:8px;background:white;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer">
+            <input type="radio" name="complexity" value="1.0" onchange="updateComplexityPreview()" style="cursor:pointer">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500;color:#1f2937">Simple (×1.0)</div>
+              <div style="font-size:11px;color:#6b7280">Outer rectangle only, no holes/slots</div>
+            </div>
+          </label>
+          
+          <label style="display:flex;align-items:center;gap:8px;padding:8px;background:white;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer">
+            <input type="radio" name="complexity" value="1.5" checked onchange="updateComplexityPreview()" style="cursor:pointer">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500;color:#1f2937">Medium (×1.5) — Recommended</div>
+              <div style="font-size:11px;color:#6b7280">Has slots, notches, or several holes</div>
+            </div>
+          </label>
+          
+          <label style="display:flex;align-items:center;gap:8px;padding:8px;background:white;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer">
+            <input type="radio" name="complexity" value="2.0" onchange="updateComplexityPreview()" style="cursor:pointer">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500;color:#1f2937">Complex (×2.0)</div>
+              <div style="font-size:11px;color:#6b7280">Many holes, dense slots, intricate patterns</div>
+            </div>
+          </label>
+        </div>
+
+        <div style="background:#ecfdf5;padding:10px;border-radius:4px;border:1px solid #10b981">
+          <div style="font-size:12px;color:#065f46;margin-bottom:4px">
+            <strong>Preview dengan koreksi:</strong>
+          </div>
+          <div style="font-size:13px;font-weight:600;color:#047857" id="complexity-preview">
+            ${estimates.total} mm × 1.5 = ${Math.round(estimates.total * 1.5)} mm
+          </div>
+          <div style="font-size:11px;color:#059669;margin-top:4px">
+            ⚠️ Ini estimasi otomatis. Verifikasi dengan gambar asli!
+          </div>
         </div>
       </div>
       
@@ -881,12 +926,34 @@ function showOCRConfirmation(dimensions, estimates) {
   
   confirmSection.innerHTML = html;
   confirmSection.style.display = 'block';
+  
+  // Store base perimeter for complexity calculation
+  window.ocrBasePerimeter = estimates.total;
 }
 
-function applyOCRResult(perimeter) {
-  document.getElementById('perim').value = perimeter;
+function updateComplexityPreview() {
+  const selected = document.querySelector('input[name="complexity"]:checked');
+  if (!selected || !window.ocrBasePerimeter) return;
+  
+  const multiplier = parseFloat(selected.value);
+  const corrected = Math.round(window.ocrBasePerimeter * multiplier);
+  
+  document.getElementById('complexity-preview').innerHTML = 
+    `${window.ocrBasePerimeter} mm × ${multiplier} = ${corrected} mm`;
+}
+
+function applyOCRResult(basePerimeter) {
+  // Get selected complexity multiplier
+  const selected = document.querySelector('input[name="complexity"]:checked');
+  const multiplier = selected ? parseFloat(selected.value) : 1.5; // default to medium
+  
+  const correctedPerimeter = Math.round(basePerimeter * multiplier);
+  
+  document.getElementById('perim').value = correctedPerimeter;
   document.getElementById('ocr-confirm-section').style.display = 'none';
-  document.getElementById('ocr-status').innerHTML = '<span style="color:#10b981">✓ OCR result applied to perimeter field</span>';
+  
+  const statusDiv = document.getElementById('ocr-status');
+  statusDiv.innerHTML = `<span style="color:#10b981">✓ OCR result applied: ${basePerimeter}mm × ${multiplier} = ${correctedPerimeter}mm (${multiplier === 1 ? 'Simple' : multiplier === 1.5 ? 'Medium' : 'Complex'})</span>`;
   
   // Scroll to perimeter field
   document.getElementById('perim').focus();
