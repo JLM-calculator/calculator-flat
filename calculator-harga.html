@@ -645,58 +645,87 @@ window.addEventListener('DOMContentLoaded', function() {
       setTimeout(() => {
         console.log('[AUTO-FILL] Starting auto-fill after 500ms delay...');
         
-        // Fill fields DIRECTLY without calling onMat()
-        const pierceInput = document.getElementById('v-pierce');
-        const detikInput = document.getElementById('v-detik');
-        
-        if (pierceInput) {
-          pierceInput.value = pierceCount;
-          console.log('[AUTO-FILL] ✓ Pierce count set to:', pierceCount);
+        // Set material FIRST
+        const matSelect = document.getElementById('sel-mat');
+        if (matSelect) {
+          matSelect.value = data.material;
+          console.log('[AUTO-FILL] ✓ Material set to:', data.material);
           
-          // Highlight pierce field
-          pierceInput.style.backgroundColor = '#ecfdf5';
-          pierceInput.style.borderColor = '#10b981';
-          pierceInput.style.color = '#047857';
-          pierceInput.title = 'Auto-filled from Calculator Waktu';
-          
-          pierceInput.addEventListener('focus', function() {
-            this.style.backgroundColor = 'white';
-            this.style.borderColor = '#ddd';
-            this.style.color = 'inherit';
-          });
+          // Trigger onMat to populate thickness dropdown
+          if (typeof onMat === 'function') {
+            onMat();
+            console.log('[AUTO-FILL] ✓ onMat() called to populate thickness options');
+          }
         } else {
-          console.error('[AUTO-FILL] ✗ Pierce input (#v-pierce) not found!');
+          console.error('[AUTO-FILL] ✗ Material select (#sel-mat) not found!');
         }
         
-        if (detikInput) {
-          detikInput.value = waktuSec;
-          console.log('[AUTO-FILL] ✓ Durasi detik set to:', waktuSec);
+        // Wait for thickness dropdown to be populated by onMat
+        setTimeout(() => {
+          console.log('[AUTO-FILL] Setting thickness after onMat completes...');
           
-          // Highlight detik field
-          detikInput.style.backgroundColor = '#ecfdf5';
-          detikInput.style.borderColor = '#10b981';
-          detikInput.style.color = '#047857';
-          detikInput.title = 'Auto-filled from Calculator Waktu';
+          // Set thickness
+          const tblSelect = document.getElementById('sel-tbl');
+          if (tblSelect) {
+            tblSelect.value = data.tebal;
+            console.log('[AUTO-FILL] ✓ Thickness set to:', data.tebal);
+          } else {
+            console.error('[AUTO-FILL] ✗ Thickness select (#sel-tbl) not found!');
+          }
           
-          detikInput.addEventListener('focus', function() {
-            this.style.backgroundColor = 'white';
-            this.style.borderColor = '#ddd';
-            this.style.color = 'inherit';
-          });
-        } else {
-          console.error('[AUTO-FILL] ✗ Detik input (#v-detik) not found!');
-        }
-        
-        // Trigger calculation
-        if (typeof calc === 'function') {
-          calc();
-          console.log('[AUTO-FILL] ✓ calc() called');
-        } else {
-          console.error('[AUTO-FILL] ✗ calc() function not found!');
-        }
-        
-        console.log('[AUTO-FILL] === AUTO-FILL COMPLETE ===');
-      }, 500);  // Increased delay to 500ms
+          // Now set pierce and durasi
+          const pierceInput = document.getElementById('v-pierce');
+          const detikInput = document.getElementById('v-detik');
+          
+          if (pierceInput) {
+            pierceInput.value = pierceCount;
+            console.log('[AUTO-FILL] ✓ Pierce count set to:', pierceCount);
+            
+            // Highlight pierce field
+            pierceInput.style.backgroundColor = '#ecfdf5';
+            pierceInput.style.borderColor = '#10b981';
+            pierceInput.style.color = '#047857';
+            pierceInput.title = 'Auto-filled from Calculator Waktu';
+            
+            pierceInput.addEventListener('focus', function() {
+              this.style.backgroundColor = 'white';
+              this.style.borderColor = '#ddd';
+              this.style.color = 'inherit';
+            });
+          } else {
+            console.error('[AUTO-FILL] ✗ Pierce input (#v-pierce) not found!');
+          }
+          
+          if (detikInput) {
+            detikInput.value = waktuSec;
+            console.log('[AUTO-FILL] ✓ Durasi detik set to:', waktuSec);
+            
+            // Highlight detik field
+            detikInput.style.backgroundColor = '#ecfdf5';
+            detikInput.style.borderColor = '#10b981';
+            detikInput.style.color = '#047857';
+            detikInput.title = 'Auto-filled from Calculator Waktu';
+            
+            detikInput.addEventListener('focus', function() {
+              this.style.backgroundColor = 'white';
+              this.style.borderColor = '#ddd';
+              this.style.color = 'inherit';
+            });
+          } else {
+            console.error('[AUTO-FILL] ✗ Detik input (#v-detik) not found!');
+          }
+          
+          // Trigger calculation
+          if (typeof calc === 'function') {
+            calc();
+            console.log('[AUTO-FILL] ✓ calc() called');
+          } else {
+            console.error('[AUTO-FILL] ✗ calc() function not found!');
+          }
+          
+          console.log('[AUTO-FILL] === AUTO-FILL COMPLETE ===');
+        }, 200);  // Wait 200ms for onMat to complete
+      }, 500);  // Initial delay to ensure DOM is ready
       
     } catch (e) {
       console.error('[AUTO-FILL] ✗ Error:', e.message, e.stack);
