@@ -120,7 +120,7 @@ input[type=number]:focus,select:focus{border-color:var(--border2);background:var
       <div class="mc"><p class="mc-lbl">Listrik</p><p class="mc-val">Rp 10<span style="font-size:10px;font-weight:normal">/dtk</span></p></div>
       <div class="mc"><p class="mc-lbl">Depresiasi</p><p class="mc-val">Rp 25<span style="font-size:10px;font-weight:normal">/dtk</span></p></div>
       <div class="mc"><p class="mc-lbl">Operator</p><p class="mc-val">Rp 20<span style="font-size:10px;font-weight:normal">/dtk</span></p></div>
-      <div class="mc warn"><p class="mc-lbl warn">Tetap/dtk</p><p class="mc-val warn">Rp 55</p><p class="mc-sub">+ gas &amp; consbl</p></div>
+      <div class="mc warn"><p class="mc-lbl warn">Tetap/dtk</p><p class="mc-val warn">Rp 60</p><p class="mc-sub">+ gas &amp; consbl</p></div>
     </div>
   </div>
 
@@ -253,7 +253,7 @@ input[type=number]:focus,select:focus{border-color:var(--border2);background:var
 
 <script>
 // ── KONSTANTA MESIN ──────────────────────────────────────────────
-const MESIN_TETAP = 55;
+const MESIN_TETAP = 60;
 const PIERCE_RATE = 100;
 const SHEET_ID    = '1knzvxxnt2ugKXpTMgkQ4QzP8EN_kE_HeOHvw0u7Ny10';
 const SHEET_CSV   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
@@ -427,6 +427,13 @@ function setMode(m) {
 }
 function onMat() {
   const mat = document.getElementById('sel-mat').value;
+  
+  // Safety check: ensure JASA_RATE exists and has data for this material
+  if (!JASA_RATE || !JASA_RATE[mat]) {
+    console.warn('[onMat] JASA_RATE not loaded for material:', mat);
+    return;
+  }
+  
   const ks  = Object.keys(JASA_RATE[mat]).map(Number).sort((a,b)=>a-b);
   document.getElementById('sel-tbl').innerHTML = ks.map(k=>`<option value="${k}">${k}</option>`).join('');
   calc();
@@ -532,7 +539,7 @@ function calc() {
   const actualProfJ = jualJ - hppJ;  // Recalculate actual profit based on manual jualJ
 
   document.getElementById('bd-j').innerHTML =
-    `<div class="br"><span><span class="ico">⚙</span>Mesin tetap — Rp 55/dtk × ${ql}</span><span>${fmt(bMesin)}</span></div>`+
+    `<div class="br"><span><span class="ico">⚙</span>Mesin tetap — Rp 60/dtk × ${ql}</span><span>${fmt(bMesin)}</span></div>`+
     `<div class="br ind"><span>Listrik</span><span>${fmt(dtk*10)}</span></div>`+
     `<div class="br ind"><span>Depresiasi mesin</span><span>${fmt(dtk*25)}</span></div>`+
     `<div class="br ind"><span>Operator</span><span>${fmt(dtk*20)}</span></div>`+
