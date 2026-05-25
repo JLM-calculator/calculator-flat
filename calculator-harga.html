@@ -52,6 +52,12 @@ input[type=number]:focus,select:focus{border-color:var(--border2);background:var
 .mc-lbl.warn{color:var(--warn)}.mc-lbl.green{color:var(--green)}.mc-lbl.blue{color:var(--blue)}.mc-lbl.accent{color:var(--accent)}
 .mc-val{font-size:15px;font-weight:bold;font-family:'Courier New',monospace;color:var(--text)}
 .mc-val.lg{font-size:19px}.mc-val.warn{color:var(--warn)}.mc-val.green{color:var(--green)}.mc-val.blue{color:var(--blue)}.mc-val.accent{color:var(--accent)}
+.mc-val-edit{width:100%;font-size:19px;font-weight:bold;padding:8px 12px;border:2px solid #d1d5db;border-radius:8px;text-align:left;background:white;transition:all 0.2s;font-family:'Courier New',monospace}
+.mc-val-edit:hover{border-color:#10b981;background:#f0fdf4}
+.mc-val-edit:focus{outline:none;border-color:#10b981;background:#ecfdf5;box-shadow:0 0 0 3px rgba(16,185,129,0.1)}
+.mc-val-edit::placeholder{color:#9ca3af;font-weight:500}
+.mc-val-edit.manual-mode{border-color:#f59e0b;background:#fffbeb}
+.mc-val-edit.manual-mode:focus{border-color:#f59e0b;background:#fef3c7;box-shadow:0 0 0 3px rgba(245,158,11,0.1)}
 .mc-sub{font-size:10px;color:var(--text3);font-family:'Courier New',monospace;margin-top:2px}
 .gbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:2px}
 .gchip{font-size:11px;font-family:'Courier New',monospace;padding:3px 9px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text2)}
@@ -196,7 +202,17 @@ input[type=number]:focus,select:focus{border-color:var(--border2);background:var
       <p class="rbox-ttl">▶ Penawaran — jasa saja</p>
       <div class="g3">
         <div class="mc blue"><p class="mc-lbl blue"><span class="pill warn">HPP Jasa</span></p><p class="mc-val lg warn" id="o-hj">Rp 0</p></div>
-        <div class="mc blue"><p class="mc-lbl blue"><span class="pill grn">Harga jual jasa</span></p><p class="mc-val lg green" id="o-jj">Rp 0</p></div>
+        <div class="mc blue"><p class="mc-lbl blue"><span class="pill grn">Harga jual jasa</span></p>
+          <input type="number" id="o-jj-edit" class="mc-val-edit lg green" 
+                 placeholder="Auto" 
+                 oninput="onJualJasaManualEdit()"
+                 title="Click to edit manually. Leave empty for auto-calculation.">
+          <p class="mc-val lg green" id="o-jj" style="display:none;">Rp 0</p>
+          <p class="mc-sub" style="font-size:11px;color:#059669;margin-top:4px;">
+            <span id="jj-mode">Auto: HPP + Margin</span>
+            <button onclick="resetJualJasa()" style="margin-left:8px;padding:2px 8px;font-size:10px;background:#10b981;color:white;border:none;border-radius:4px;cursor:pointer;display:none;" id="btn-reset-jj">Reset</button>
+          </p>
+        </div>
         <div class="mc blue"><p class="mc-lbl blue"><span class="pill blue">Profit</span></p><p class="mc-val lg blue" id="o-pj">Rp 0</p><p class="mc-sub" id="o-pj-s"></p></div>
       </div>
     </div>
@@ -205,7 +221,17 @@ input[type=number]:focus,select:focus{border-color:var(--border2);background:var
         <p class="rbox-ttl">▶ Penawaran — jasa + bahan</p>
         <div class="g2" style="margin-bottom:10px">
           <div class="mc green"><p class="mc-lbl green"><span class="pill warn">HPP Total</span></p><p class="mc-val lg warn" id="o-ht">Rp 0</p><p class="mc-sub">Jasa + bahan</p></div>
-          <div class="mc green"><p class="mc-lbl green"><span class="pill grn">Harga jual total</span></p><p class="mc-val lg green" id="o-jt">Rp 0</p><p class="mc-sub">Yang ditagih ke customer</p></div>
+          <div class="mc green"><p class="mc-lbl green"><span class="pill grn">Harga jual total</span></p>
+            <input type="number" id="o-jt-edit" class="mc-val-edit lg green" 
+                   placeholder="Auto" 
+                   oninput="onJualTotalManualEdit()"
+                   title="Click to edit manually. Leave empty for auto-calculation.">
+            <p class="mc-val lg green" id="o-jt" style="display:none;">Rp 0</p>
+            <p class="mc-sub">
+              <span id="jt-mode">Yang ditagih ke customer</span>
+              <button onclick="resetJualTotal()" style="margin-left:8px;padding:2px 8px;font-size:10px;background:#10b981;color:white;border:none;border-radius:4px;cursor:pointer;display:none;" id="btn-reset-jt">Reset</button>
+            </p>
+          </div>
         </div>
         <div class="g2">
           <div class="mc green"><p class="mc-lbl green"><span class="pill blue">Profit jasa</span></p><p class="mc-val blue" id="o-pj2">Rp 0</p></div>
@@ -406,6 +432,70 @@ function onMat() {
   calc();
 }
 
+// ── MANUAL OVERRIDE FOR HARGA JUAL ────────────────────────────────
+let manualJualJasa = null;   // null = auto, number = manual override
+let manualJualTotal = null;  // null = auto, number = manual override
+
+function onJualJasaManualEdit() {
+  const input = document.getElementById('o-jj-edit');
+  const val = input.value.trim();
+  
+  if (val === '' || val === '0') {
+    // Empty or 0 = back to auto mode
+    manualJualJasa = null;
+    input.classList.remove('manual-mode');
+    document.getElementById('jj-mode').textContent = 'Auto: HPP + Margin';
+    document.getElementById('btn-reset-jj').style.display = 'none';
+  } else {
+    // Manual value entered
+    manualJualJasa = parseInt(val);
+    input.classList.add('manual-mode');
+    document.getElementById('jj-mode').textContent = 'Manual Override';
+    document.getElementById('btn-reset-jj').style.display = 'inline-block';
+  }
+  
+  calc(); // Recalculate with manual value
+}
+
+function resetJualJasa() {
+  document.getElementById('o-jj-edit').value = '';
+  manualJualJasa = null;
+  document.getElementById('o-jj-edit').classList.remove('manual-mode');
+  document.getElementById('jj-mode').textContent = 'Auto: HPP + Margin';
+  document.getElementById('btn-reset-jj').style.display = 'none';
+  calc();
+}
+
+function onJualTotalManualEdit() {
+  const input = document.getElementById('o-jt-edit');
+  const val = input.value.trim();
+  
+  if (val === '' || val === '0') {
+    // Empty or 0 = back to auto mode
+    manualJualTotal = null;
+    input.classList.remove('manual-mode');
+    document.getElementById('jt-mode').textContent = 'Yang ditagih ke customer';
+    document.getElementById('btn-reset-jt').style.display = 'none';
+  } else {
+    // Manual value entered
+    manualJualTotal = parseInt(val);
+    input.classList.add('manual-mode');
+    document.getElementById('jt-mode').textContent = 'Manual Override';
+    document.getElementById('btn-reset-jt').style.display = 'inline-block';
+  }
+  
+  calc(); // Recalculate with manual value
+}
+
+function resetJualTotal() {
+  document.getElementById('o-jt-edit').value = '';
+  manualJualTotal = null;
+  document.getElementById('o-jt-edit').classList.remove('manual-mode');
+  document.getElementById('jt-mode').textContent = 'Yang ditagih ke customer';
+  document.getElementById('btn-reset-jt').style.display = 'none';
+  calc();
+}
+
 // ── HITUNG UTAMA ─────────────────────────────────────────────────
 function calc() {
   const mat    = document.getElementById('sel-mat').value;
@@ -438,7 +528,8 @@ function calc() {
   const bMesin = dtk*MESIN_TETAP, bGas = dtk*d.g, bCons = dtk*d.c;
   const hppJ = Math.round(dtk*hppDtk + biayaPierce + setup);
   const profJ = Math.round(hppJ*(mj/100));
-  const jualJ = hppJ + profJ;
+  const jualJ = manualJualJasa !== null ? manualJualJasa : (hppJ + profJ);  // Use manual if set
+  const actualProfJ = jualJ - hppJ;  // Recalculate actual profit based on manual jualJ
 
   document.getElementById('bd-j').innerHTML =
     `<div class="br"><span><span class="ico">⚙</span>Mesin tetap — Rp 55/dtk × ${ql}</span><span>${fmt(bMesin)}</span></div>`+
@@ -453,9 +544,18 @@ function calc() {
     `<div class="br grn"><span>Margin jasa ${mj}%</span><span>+ ${fmt(profJ)}</span></div>`;
 
   document.getElementById('o-hj').textContent = fmt(hppJ);
-  document.getElementById('o-jj').textContent = fmt(jualJ);
-  document.getElementById('o-pj').textContent = fmt(profJ);
-  document.getElementById('o-pj-s').textContent = mj+'% dari HPP';
+  
+  // Update Harga Jual Jasa input field
+  const jjEdit = document.getElementById('o-jj-edit');
+  if (manualJualJasa === null) {
+    jjEdit.value = jualJ;  // Show auto-calculated value
+    jjEdit.placeholder = 'Auto: ' + fmt(jualJ);
+  } else {
+    jjEdit.value = manualJualJasa;  // Show manual value
+  }
+  
+  document.getElementById('o-pj').textContent = fmt(actualProfJ);
+  document.getElementById('o-pj-s').textContent = mj+'% dari HPP' + (manualJualJasa !== null ? ' (manual override)' : '');
 
   if (mode === 'jasabahan') {
     const lb    = parseFloat(document.getElementById('v-lb').value)||0;
@@ -465,8 +565,8 @@ function calc() {
     const profB = Math.round(hppB * (mb/100));
     const jualB = hppB + profB;
     const hppT  = hppJ + hppB;
-    const jualT = jualJ + jualB;
-    const profT = profJ + profB;
+    const jualT = manualJualTotal !== null ? manualJualTotal : (jualJ + jualB);  // Use manual if set
+    const profT = jualT - hppT;  // Recalculate total profit
     const pct   = hppT>0 ? ((profT/hppT)*100).toFixed(1) : 0;
 
     const srcLabel = Object.keys(matPrices).length > 0
@@ -483,11 +583,20 @@ function calc() {
       `<div class="br" style="font-weight:bold;color:var(--text)"><span>Harga jual bahan</span><span>${fmt(jualB)}</span></div>`;
 
     document.getElementById('o-ht').textContent  = fmt(hppT);
-    document.getElementById('o-jt').textContent  = fmt(jualT);
-    document.getElementById('o-pj2').textContent = fmt(profJ);
+    
+    // Update Harga Jual Total input field
+    const jtEdit = document.getElementById('o-jt-edit');
+    if (manualJualTotal === null) {
+      jtEdit.value = jualT;  // Show auto-calculated value
+      jtEdit.placeholder = 'Auto: ' + fmt(jualT);
+    } else {
+      jtEdit.value = manualJualTotal;  // Show manual value
+    }
+    
+    document.getElementById('o-pj2').textContent = fmt(actualProfJ);
     document.getElementById('o-pb2').textContent = fmt(profB);
     document.getElementById('o-pt').textContent  = fmt(profT);
-    document.getElementById('o-pt-s').textContent = 'Margin efektif '+pct+'% dari HPP total';
+    document.getElementById('o-pt-s').textContent = 'Margin efektif '+pct+'% dari HPP total' + (manualJualTotal !== null ? ' (manual override)' : '');
   }
 }
 
