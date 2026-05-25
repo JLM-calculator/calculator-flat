@@ -499,13 +499,20 @@ fetchHarga(); // ambil dari Sheet saat buka
 
 // ── AUTO-LOAD FROM LOCALSTORAGE (from calculator-waktu) ────────────
 window.addEventListener('DOMContentLoaded', function() {
+  console.log('[AUTO-FILL] DOMContentLoaded event fired');
+  
   const stored = localStorage.getItem('laser_cutting_data');
+  console.log('[AUTO-FILL] localStorage data:', stored);
+  
   if (stored) {
     try {
       const data = JSON.parse(stored);
+      console.log('[AUTO-FILL] Parsed data:', data);
       
       const waktuSec = Math.ceil(data.waktu);  // Round UP: 2.9 → 3
       const pierceCount = data.piercing || 0;
+      
+      console.log('[AUTO-FILL] Processed values:', { waktuSec, pierceCount });
       
       // Show notification bar with auto-filled data
       const notif = document.createElement('div');
@@ -520,67 +527,73 @@ window.addEventListener('DOMContentLoaded', function() {
       const sidebar = document.querySelector('.sidebar');
       if (sidebar && sidebar.firstChild) {
         sidebar.insertBefore(notif, sidebar.firstChild);
+        console.log('[AUTO-FILL] Notification bar inserted');
+      } else {
+        console.error('[AUTO-FILL] Sidebar not found!');
       }
       
-      // Auto-fill form with all data
-      document.getElementById('sel-mat').value = data.material;
-      onMat(); // refresh thickness dropdown
-      
+      // Delay auto-fill to ensure all elements are ready
       setTimeout(() => {
-        // Set thickness
-        document.getElementById('sel-tbl').value = data.tebal;
+        console.log('[AUTO-FILL] Starting auto-fill after 500ms delay...');
         
-        // Set piercing count — AUTO FILLED
-        document.getElementById('v-pierce').value = pierceCount;
-        
-        // Switch to "detik" input mode
-        met = 'detik';
-        document.querySelectorAll('.sbtn').forEach(b => b.classList.remove('on'));
-        const detikBtn = Array.from(document.querySelectorAll('.sbtn')).find(b => b.textContent.includes('Detik'));
-        if (detikBtn) detikBtn.classList.add('on');
-        
-        // Fill durasi cutting detik — AUTO FILLED
-        document.getElementById('v-detik').value = waktuSec;
-        document.getElementById('i-detik').style.display = 'flex';
-        document.getElementById('i-menit').style.display = 'none';
-        document.getElementById('i-m2').style.display = 'none';
-        document.getElementById('i-cm2').style.display = 'none';
-        
-        // Highlight the auto-filled fields to show they came from calculator waktu
-        const detikInput = document.getElementById('v-detik');
+        // Fill fields DIRECTLY without calling onMat()
         const pierceInput = document.getElementById('v-pierce');
+        const detikInput = document.getElementById('v-detik');
         
-        detikInput.style.backgroundColor = '#ecfdf5';
-        detikInput.style.borderColor = '#10b981';
-        detikInput.style.color = '#047857';
-        detikInput.title = 'Auto-filled from Calculator Waktu. Click to edit.';
-        detikInput.style.cursor = 'pointer';
+        if (pierceInput) {
+          pierceInput.value = pierceCount;
+          console.log('[AUTO-FILL] ✓ Pierce count set to:', pierceCount);
+          
+          // Highlight pierce field
+          pierceInput.style.backgroundColor = '#ecfdf5';
+          pierceInput.style.borderColor = '#10b981';
+          pierceInput.style.color = '#047857';
+          pierceInput.title = 'Auto-filled from Calculator Waktu';
+          
+          pierceInput.addEventListener('focus', function() {
+            this.style.backgroundColor = 'white';
+            this.style.borderColor = '#ddd';
+            this.style.color = 'inherit';
+          });
+        } else {
+          console.error('[AUTO-FILL] ✗ Pierce input (#v-pierce) not found!');
+        }
         
-        pierceInput.style.backgroundColor = '#ecfdf5';
-        pierceInput.style.borderColor = '#10b981';
-        pierceInput.style.color = '#047857';
-        pierceInput.title = 'Auto-filled from Calculator Waktu. Click to edit.';
-        pierceInput.style.cursor = 'pointer';
+        if (detikInput) {
+          detikInput.value = waktuSec;
+          console.log('[AUTO-FILL] ✓ Durasi detik set to:', waktuSec);
+          
+          // Highlight detik field
+          detikInput.style.backgroundColor = '#ecfdf5';
+          detikInput.style.borderColor = '#10b981';
+          detikInput.style.color = '#047857';
+          detikInput.title = 'Auto-filled from Calculator Waktu';
+          
+          detikInput.addEventListener('focus', function() {
+            this.style.backgroundColor = 'white';
+            this.style.borderColor = '#ddd';
+            this.style.color = 'inherit';
+          });
+        } else {
+          console.error('[AUTO-FILL] ✗ Detik input (#v-detik) not found!');
+        }
         
-        // Allow editing - clear highlight on focus
-        detikInput.addEventListener('focus', function() {
-          this.style.backgroundColor = 'white';
-          this.style.borderColor = '#ddd';
-          this.style.color = 'inherit';
-        });
+        // Trigger calculation
+        if (typeof calc === 'function') {
+          calc();
+          console.log('[AUTO-FILL] ✓ calc() called');
+        } else {
+          console.error('[AUTO-FILL] ✗ calc() function not found!');
+        }
         
-        pierceInput.addEventListener('focus', function() {
-          this.style.backgroundColor = 'white';
-          this.style.borderColor = '#ddd';
-          this.style.color = 'inherit';
-        });
-        
-        calc(); // recalculate with auto-filled data
-      }, 100);
+        console.log('[AUTO-FILL] === AUTO-FILL COMPLETE ===');
+      }, 500);  // Increased delay to 500ms
       
     } catch (e) {
-      console.error('Error loading stored data:', e);
+      console.error('[AUTO-FILL] ✗ Error:', e.message, e.stack);
     }
+  } else {
+    console.log('[AUTO-FILL] No data in localStorage');
   }
 });
 
