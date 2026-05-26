@@ -624,11 +624,14 @@ window.addEventListener('DOMContentLoaded', function() {
     try {
       const data = JSON.parse(stored);
       console.log('[AUTO-FILL] Parsed data:', data);
+      console.log('[AUTO-FILL] data.piercing value:', data.piercing);
+      console.log('[AUTO-FILL] data.waktu value:', data.waktu);
       
       const waktuSec = Math.ceil(data.waktu);  // Round UP: 2.9 → 3
-      const pierceCount = data.piercing || 0;
+      const pierceCount = parseInt(data.piercing) || 0;  // Ensure it's a number
       
       console.log('[AUTO-FILL] Processed values:', { waktuSec, pierceCount });
+      console.log('[AUTO-FILL] Pierce count type:', typeof pierceCount, 'value:', pierceCount);
       
       // Show notification bar with auto-filled data
       const notif = document.createElement('div');
@@ -684,9 +687,14 @@ window.addEventListener('DOMContentLoaded', function() {
           const pierceInput = document.getElementById('v-pierce');
           const detikInput = document.getElementById('v-detik');
           
+          console.log('[AUTO-FILL] About to set pierce input. pierceCount =', pierceCount);
+          console.log('[AUTO-FILL] Pierce input element:', pierceInput);
+          
           if (pierceInput) {
+            console.log('[AUTO-FILL] Current pierce input value:', pierceInput.value);
             pierceInput.value = pierceCount;
             console.log('[AUTO-FILL] ✓ Pierce count set to:', pierceCount);
+            console.log('[AUTO-FILL] New pierce input value:', pierceInput.value);
             
             // Highlight pierce field
             pierceInput.style.backgroundColor = '#ecfdf5';
