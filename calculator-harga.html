@@ -428,11 +428,26 @@ function parseCSV(text) {
     let h = parseFloat(hargaClean);
     if (isNaN(h) || h <= 0) continue;
     
-    // KEY FIX: if value < 10000, assume it's in ribuan (thousands)
-    // Google Sheet often stores 1250 meaning Rp 1.250.000
-    // Safe threshold: material prices are always >= Rp 100.000/m²
-    if (h < 10000) {
+    // SMART FIX: detect unit of stored price
+    // Material laser cutting prices are always between Rp 100.000 - Rp 10.000.000 per m²
+    // Google Sheet may store in different units:
+    //   - Full value: 1250000 → keep as-is
+    //   - Ribuan:     1250    → × 1000   = 1.250.000  
+    //   - Jutaan:     1.25    → × 1000000 = 1.250.000
+    //   - Ratusan:    1250    already handled above
+    if (h >= 100000) {
+      // Already full Rupiah value (e.g. 1250000) → no change
+    } else if (h >= 100) {
+      // Stored in ribuan (e.g. 1250 = Rp 1.250.000) → × 1000
       h = h * 1000;
+    } else if (h >= 0.1) {
+      // Stored in jutaan (e.g. 1.25 = Rp 1.250.000) → × 1000000
+      h = h * 1000000;
+    }
+    // Safety: final value must be between Rp 50.000 and Rp 50.000.000
+    if (h < 50000 || h > 50000000) {
+      console.warn('[parseCSV] Suspicious price value, skipping:', h, 'for', jenis, tebal);
+      continue;
     }
     
     if (!newPrices[matKey]) newPrices[matKey] = {};
@@ -736,124 +751,64 @@ window.addEventListener('DOMContentLoaded', function() {
         console.error('[AUTO-FILL] Sidebar not found!');
       }
       
-      // Delay auto-fill to ensure all elements are ready
+      // Auto-fill: 500ms outer (DOM ready) + 200ms inner (onMat done)
       setTimeout(() => {
-        console.log('[AUTO-FILL] Starting auto-fill after 500ms delay...');
-        
-      // Cross-calculator material key mapping
-      // calculator-waktu uses: cs, ss, al, br
-      // calculator-harga uses: mildsteel, stainless_ss304, aluminium, etc.
-      const MAT_CROSSMAP = {
-        'cs':              'mildsteel',
-        'ss':              'stainless_ss304',
-        'al':              'aluminium',
-        'br':              'mildsteel',
-        // names from calculator-waktu (after rename)
-        'mild steel (ms)': 'mildsteel',
-        'mild steel':      'mildsteel',
-        'mildsteel':       'mildsteel',
-        'stainless steel': 'stainless_ss304',
-        'stainless':       'stainless_ss304',
-        // old name still handled just in case
-        'carbon steel':    'mildsteel',
-        'aluminum':        'aluminium',
-        'aluminium':       'aluminium',
-        'galvanis':        'galvanis',
-        'stainless_ss304': 'stainless_ss304',
-        'stainless_ss201': 'stainless_ss201',
-      };
-      
-      // Resolve material key
-      const rawMat = (data.material || '').toLowerCase().trim();
-      const resolvedMat = MAT_CROSSMAP[rawMat] || MAT_CROSSMAP[data.materialName?.toLowerCase().trim()] || 'mildsteel';
-      console.log('[AUTO-FILL] Material mapping:', rawMat, '→', resolvedMat);
-      
-      // Set material FIRST
-      const matSelect = document.getElementById('sel-mat');
-      if (matSelect) {
-        matSelect.value = resolvedMat;
-        console.log('[AUTO-FILL] ✓ Material set to:', resolvedMat);
-        
-        // Trigger onMat to populate thickness dropdown
-        if (typeof onMat === 'function') {
-          onMat();
-          console.log('[AUTO-FILL] ✓ onMat() called to populate thickness options');
+        const MAT_CROSSMAP = {
+          'cs':'mildsteel','ss':'stainless_ss304','al':'aluminium','br':'mildsteel',
+          'mild steel (ms)':'mildsteel','mild steel':'mildsteel','mildsteel':'mildsteel',
+          'stainless steel':'stainless_ss304','stainless':'stainless_ss304',
+          'carbon steel':'mildsteel','aluminum':'aluminium','aluminium':'aluminium',
+          'galvanis':'galvanis','stainless_ss304':'stainless_ss304','stainless_ss201':'stainless_ss201',
+        };
+        const rawMat  = (data.material    || '').toLowerCase().trim();
+        const rawName = (data.materialName|| '').toLowerCase().trim();
+        const resolvedMat = MAT_CROSSMAP[rawMat] || MAT_CROSSMAP[rawName] || 'mildsteel';
+        console.log('[AUTO-FILL] material:', rawMat, '/', rawName, '→', resolvedMat);
+
+        // Step 1: set material + populate thickness dropdown
+        const matSelect = document.getElementById('sel-mat');
+        if (matSelect) {
+          matSelect.value = resolvedMat;
+          if (typeof onMat === 'function') onMat();
+          console.log('[AUTO-FILL] material select value:', matSelect.value);
         }
-      } else {
-        console.error('[AUTO-FILL] ✗ Material select (#sel-mat) not found!');
-      }
-      
-      // Wait for thickness dropdown to be populated by onMat
-      setTimeout(() => {
-        console.log('[AUTO-FILL] Setting thickness after onMat completes...');
-          
-          // Set thickness
+
+        // Step 2 (200ms later): set thickness, pierce, durasi, calc
+        setTimeout(() => {
+          // --- thickness: find closest option ---
           const tblSelect = document.getElementById('sel-tbl');
           if (tblSelect) {
-            tblSelect.value = data.tebal;
-            console.log('[AUTO-FILL] ✓ Thickness set to:', data.tebal);
-          } else {
-            console.error('[AUTO-FILL] ✗ Thickness select (#sel-tbl) not found!');
+            const target = parseFloat(data.tebal);
+            const best = Array.from(tblSelect.options).sort((a,b) =>
+              Math.abs(parseFloat(a.value)-target) - Math.abs(parseFloat(b.value)-target))[0];
+            if (best) { tblSelect.value = best.value; }
+            console.log('[AUTO-FILL] tebal set to:', tblSelect.value, '(target:', target, ')');
           }
-          
-          // Now set pierce and durasi
+
+          // --- pierce ---
           const pierceInput = document.getElementById('v-pierce');
-          const detikInput = document.getElementById('v-detik');
-          
-          console.log('[AUTO-FILL] About to set pierce input. pierceCount =', pierceCount);
-          console.log('[AUTO-FILL] Pierce input element:', pierceInput);
-          
           if (pierceInput) {
-            console.log('[AUTO-FILL] Current pierce input value:', pierceInput.value);
             pierceInput.value = pierceCount;
-            console.log('[AUTO-FILL] ✓ Pierce count set to:', pierceCount);
-            console.log('[AUTO-FILL] New pierce input value:', pierceInput.value);
-            
-            // Highlight pierce field
-            pierceInput.style.backgroundColor = '#ecfdf5';
-            pierceInput.style.borderColor = '#10b981';
-            pierceInput.style.color = '#047857';
-            pierceInput.title = 'Auto-filled from Calculator Waktu';
-            
-            pierceInput.addEventListener('focus', function() {
-              this.style.backgroundColor = 'white';
-              this.style.borderColor = '#ddd';
-              this.style.color = 'inherit';
-            });
-          } else {
-            console.error('[AUTO-FILL] ✗ Pierce input (#v-pierce) not found!');
+            pierceInput.style.cssText += ';background:#ecfdf5;border-color:#10b981;color:#047857';
+            pierceInput.title = 'Auto-filled dari Calculator Waktu';
+            pierceInput.addEventListener('focus', function(){ this.style.background='white';this.style.borderColor='#ddd';this.style.color='inherit'; });
+            console.log('[AUTO-FILL] pierce set to:', pierceCount);
           }
-          
+
+          // --- durasi ---
+          const detikInput = document.getElementById('v-detik');
           if (detikInput) {
             detikInput.value = waktuSec;
-            console.log('[AUTO-FILL] ✓ Durasi detik set to:', waktuSec);
-            
-            // Highlight detik field
-            detikInput.style.backgroundColor = '#ecfdf5';
-            detikInput.style.borderColor = '#10b981';
-            detikInput.style.color = '#047857';
-            detikInput.title = 'Auto-filled from Calculator Waktu';
-            
-            detikInput.addEventListener('focus', function() {
-              this.style.backgroundColor = 'white';
-              this.style.borderColor = '#ddd';
-              this.style.color = 'inherit';
-            });
-          } else {
-            console.error('[AUTO-FILL] ✗ Detik input (#v-detik) not found!');
+            detikInput.style.cssText += ';background:#ecfdf5;border-color:#10b981;color:#047857';
+            detikInput.title = 'Auto-filled dari Calculator Waktu';
+            detikInput.addEventListener('focus', function(){ this.style.background='white';this.style.borderColor='#ddd';this.style.color='inherit'; });
+            console.log('[AUTO-FILL] durasi set to:', waktuSec);
           }
-          
-          // Trigger calculation
-          if (typeof calc === 'function') {
-            calc();
-            console.log('[AUTO-FILL] ✓ calc() called');
-          } else {
-            console.error('[AUTO-FILL] ✗ calc() function not found!');
-          }
-          
-          console.log('[AUTO-FILL] === AUTO-FILL COMPLETE ===');
-        }, 200);  // Wait 200ms for onMat to complete
-      }, 500);  // Initial delay to ensure DOM is ready
+
+          // --- recalculate ---
+          if (typeof calc === 'function') { calc(); console.log('[AUTO-FILL] COMPLETE ✓'); }
+        }, 200);
+      }, 500)
       
     } catch (e) {
       console.error('[AUTO-FILL] ✗ Error:', e.message, e.stack);
