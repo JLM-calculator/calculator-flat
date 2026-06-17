@@ -102,6 +102,7 @@ input[type=number]:focus,select:focus{border-color:var(--border2);background:var
 @media(max-width:760px){.layout{grid-template-columns:1fr}.sidebar{border-right:none;border-bottom:1px solid var(--border)}.mc-grid{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:1fr 1fr}}
 </style>
 </head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <body>
 
 <header class="header">
@@ -251,6 +252,49 @@ input[type=number]:focus,select:focus{border-color:var(--border2);background:var
 </main>
 </div>
 
+</div>
+
+<!-- PDF EXPORT BUTTON -->
+<div style="margin-top:20px;padding:20px;text-align:center;border-top:1px solid var(--border)">
+  <button onclick="showQuotationConfirm()" style="padding:12px 24px;background:#10b981;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;min-width:220px;box-shadow:0 2px 8px rgba(16,185,129,0.3)">
+    📄 Export ke PDF Penawaran
+  </button>
+</div>
+
+<!-- QUOTATION CONFIRMATION MODAL -->
+<div id="quotation-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto">
+  <div style="background:white;margin:40px auto;max-width:500px;border-radius:12px;padding:24px;box-shadow:0 10px 40px rgba(0,0,0,0.2)">
+    <h2 style="margin:0 0 20px;color:#1f2937;font-size:18px">📋 Konfirmasi Penawaran</h2>
+    
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:6px">Finishing (Opsional)</label>
+      <input type="text" id="modal-finishing" placeholder="Contoh: Powder coating, Chrome plating, dll" 
+             style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box">
+    </div>
+    
+    <div style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:6px">Shipping (Opsional)</label>
+      <input type="number" id="modal-shipping" placeholder="Biaya tambahan (Rp)" min="0"
+             style="width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box">
+    </div>
+    
+    <div style="margin-bottom:20px;padding:12px;background:#f3f4f6;border-radius:6px">
+      <p style="margin:0;font-size:12px;color:#6b7280">
+        ℹ️ Data material, tebal, durasi cutting & piercing sudah otomatis terisi dari kalkulasi sebelumnya.
+      </p>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button onclick="closeQuotationModal()" style="padding:10px;background:#e5e7eb;color:#1f2937;border:none;border-radius:6px;cursor:pointer;font-weight:500;font-size:13px">
+        ✕ Batalkan
+      </button>
+      <button onclick="generateQuotationPDF()" style="padding:10px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:500;font-size:13px">
+        ✓ Generate PDF
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── KONSTANTA MESIN ──────────────────────────────────────────────
 const MESIN_TETAP = 60;
@@ -348,8 +392,47 @@ function parseCSV(text) {
     const matKey = MAT_MAP[jenis.toLowerCase().trim()];
     if (!matKey) continue;
     const t = parseFloat(tebal);
-    const h = parseFloat(harga.replace(/[.,\s]/g, '').replace(/\.(\d{3})/g, '$1'));
-    if (isNaN(t) || isNaN(h) || h <= 0) continue;
+    
+    // Fix: handle various harga formats from Google Sheet
+    // Remove currency symbols, spaces, quotes first
+    let hargaClean = harga.replace(/[Rp\s"']/gi, '').trim();
+    
+    // If contains dot AND comma: e.g. "1.250.000" or "1,250,000"
+    // Remove all separators
+    if ((hargaClean.match(/\./g)||[]).length > 1 || (hargaClean.match(/,/g)||[]).length > 1) {
+      hargaClean = hargaClean.replace(/[.,]/g, '');
+    }
+    // Single separator: could be decimal or thousands
+    // e.g. "1.250" = 1250 (thousand sep) OR "1.25" = 1.25 (decimal)
+    else if (hargaClean.includes('.')) {
+      const parts = hargaClean.split('.');
+      if (parts[1] && parts[1].length === 3) {
+        // "1.250" → thousands separator → 1250
+        hargaClean = hargaClean.replace('.', '');
+      }
+      // else: "1.25" → decimal, keep as is
+    }
+    else if (hargaClean.includes(',')) {
+      const parts = hargaClean.split(',');
+      if (parts[1] && parts[1].length === 3) {
+        // "1,250" → thousands separator → 1250
+        hargaClean = hargaClean.replace(',', '');
+      } else {
+        // "1,25" → decimal comma → convert to dot
+        hargaClean = hargaClean.replace(',', '.');
+      }
+    }
+    
+    let h = parseFloat(hargaClean);
+    if (isNaN(h) || h <= 0) continue;
+    
+    // KEY FIX: if value < 10000, assume it's in ribuan (thousands)
+    // Google Sheet often stores 1250 meaning Rp 1.250.000
+    // Safe threshold: material prices are always >= Rp 100.000/m²
+    if (h < 10000) {
+      h = h * 1000;
+    }
+    
     if (!newPrices[matKey]) newPrices[matKey] = {};
     newPrices[matKey][t] = h;
     count++;
@@ -754,6 +837,213 @@ function clearStoredData() {
   localStorage.removeItem('laser_cutting_data');
   location.reload();
 }
+
+// ── PDF EXPORT FUNCTIONS ──────────────────────────────────────
+function showQuotationConfirm() {
+  document.getElementById('quotation-modal').style.display = 'block';
+}
+
+function closeQuotationModal() {
+  document.getElementById('quotation-modal').style.display = 'none';
+  document.getElementById('modal-finishing').value = '';
+  document.getElementById('modal-shipping').value = '';
+}
+
+function generateQuotationPDF() {
+  const finishing = document.getElementById('modal-finishing').value || 'Tidak ada';
+  const shipping = parseInt(document.getElementById('modal-shipping').value) || 0;
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  
+  // Collect current calculator data
+  const material = document.getElementById('sel-mat').value;
+  const materialLabel = document.getElementById('sel-mat').options[document.getElementById('sel-mat').selectedIndex].text;
+  const tebal = parseFloat(document.getElementById('sel-tbl').value);
+  const durasi = parseInt(document.getElementById('v-detik').value);
+  const piercing = parseInt(document.getElementById('v-pierce').value);
+  const margin = parseInt(document.getElementById('v-mj').value);
+  
+  // Get price values from display
+  const hppJasaText = document.getElementById('o-hj').textContent;
+  const hargaJualJasaText = document.getElementById('o-jj-edit').value || document.getElementById('o-jj-edit').placeholder;
+  
+  // Clean and parse rupiah values
+  const hppJasa = parseInt(hppJasaText.replace(/[^0-9]/g, ''));
+  const hargaJualJasa = parseInt(hargaJualJasaText.replace(/[^0-9]/g, ''));
+  
+  let hppBahan = 0, hargaJualBahan = 0, hppTotal = 0, hargaJualTotal = 0;
+  
+  if (mode === 'jasa+bahan') {
+    hppBahan = parseInt(document.getElementById('o-hb').textContent.replace(/[^0-9]/g, '') || 0);
+    hargaJualBahan = parseInt(document.getElementById('o-jb').textContent.replace(/[^0-9]/g, '') || 0);
+    hppTotal = hppJasa + hppBahan;
+    const jualTotalText = document.getElementById('o-jt-edit').value || document.getElementById('o-jt-edit').placeholder;
+    hargaJualTotal = parseInt(jualTotalText.replace(/[^0-9]/g, ''));
+  }
+  
+  // Create PDF content
+  const htmlContent = createQuotationHTML(mode, {
+    materialLabel, tebal, durasi, piercing, margin, finishing, shipping,
+    hppJasa, hargaJualJasa, hppBahan, hargaJualBahan, hppTotal, hargaJualTotal
+  });
+  
+  // Generate PDF
+  const options = {
+    margin: 10,
+    filename: `Penawaran-JLM-${new Date().getTime()}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+  };
+  
+  html2pdf().set(options).from(htmlContent).save();
+  
+  closeQuotationModal();
+  console.log('[PDF] Quotation generated successfully');
+}
+
+function createQuotationHTML(mode, data) {
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
+  
+  let html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Penawaran JLM</title>
+      <style>
+        body { font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6; }
+        .header { border-bottom: 2px solid #ef4444; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .logo { font-size: 24px; font-weight: bold; color: #ef4444; }
+        .logo span { color: #000; }
+        .date { text-align: right; font-size: 12px; color: #6b7280; }
+        h1 { color: #1f2937; font-size: 18px; margin: 20px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; }
+        .section { margin-bottom: 16px; }
+        .section-title { font-weight: bold; color: #374151; font-size: 13px; margin-bottom: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 12px; }
+        th { background: #f3f4f6; padding: 6px; text-align: left; font-weight: bold; border-bottom: 1px solid #d1d5db; }
+        td { padding: 6px; border-bottom: 1px solid #e5e7eb; }
+        .label { color: #6b7280; }
+        .value { font-weight: bold; color: #1f2937; }
+        .total { background: #f9fafb; font-weight: bold; }
+        .footer { font-size: 11px; color: #6b7280; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 12px; }
+        .red { color: #ef4444; }
+        .green { color: #10b981; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="logo"><span>JLM</span></div>
+        <div class="date">
+          <strong>Tanggal:</strong> ${dateStr}<br>
+          <strong>Jln. Madura No. 101</strong><br>
+          <strong>Surabaya, Jawa Timur</strong><br>
+          <strong>Ph: +62-31-xxx-xxxx</strong>
+        </div>
+      </div>
+      
+      <h1 class="red">📋 PENAWARAN HARGA JASA LASER CUTTING</h1>
+      
+      <div class="section">
+        <div class="section-title">Spesifikasi Pekerjaan:</div>
+        <table>
+          <tr>
+            <td class="label">Material:</td>
+            <td class="value">${data.materialLabel}</td>
+            <td class="label">Tebal:</td>
+            <td class="value">${data.tebal} mm</td>
+          </tr>
+          <tr>
+            <td class="label">Durasi Cutting:</td>
+            <td class="value">${data.durasi} detik</td>
+            <td class="label">Jumlah Piercing:</td>
+            <td class="value">${data.piercing} buah</td>
+          </tr>
+          <tr>
+            <td class="label">Finishing:</td>
+            <td class="value" colspan="3">${data.finishing}</td>
+          </tr>
+        </table>
+      </div>
+      
+      ${mode === 'jasa-saja' ? `
+      <div class="section">
+        <div class="section-title">💰 Harga Jasa Saja (Customer bawa plat sendiri):</div>
+        <table>
+          <tr>
+            <td class="label">HPP Jasa:</td>
+            <td class="value">Rp ${data.hppJasa.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr>
+            <td class="label">Margin (${data.margin}%):</td>
+            <td class="value">Rp ${(data.hargaJualJasa - data.hppJasa).toLocaleString('id-ID')}</td>
+          </tr>
+          ${data.shipping > 0 ? `
+          <tr>
+            <td class="label">Shipping/Expedisi:</td>
+            <td class="value">Rp ${data.shipping.toLocaleString('id-ID')}</td>
+          </tr>
+          ` : ''}
+          <tr class="total">
+            <td class="red">TOTAL HARGA JASA:</td>
+            <td class="red">Rp ${(data.hargaJualJasa + data.shipping).toLocaleString('id-ID')}</td>
+          </tr>
+        </table>
+      </div>
+      ` : `
+      <div class="section">
+        <div class="section-title">💰 Harga Jasa + Material (Plat disediakan oleh kami):</div>
+        <table>
+          <tr>
+            <td class="label">HPP Jasa:</td>
+            <td class="value">Rp ${data.hppJasa.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr>
+            <td class="label">Harga Jasa:</td>
+            <td class="value">Rp ${data.hargaJualJasa.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr style="border-top: 2px solid #e5e7eb;">
+            <td class="label">HPP Material:</td>
+            <td class="value">Rp ${data.hppBahan.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr>
+            <td class="label">Harga Material:</td>
+            <td class="value">Rp ${data.hargaJualBahan.toLocaleString('id-ID')}</td>
+          </tr>
+          ${data.shipping > 0 ? `
+          <tr>
+            <td class="label">Shipping/Expedisi:</td>
+            <td class="value">Rp ${data.shipping.toLocaleString('id-ID')}</td>
+          </tr>
+          ` : ''}
+          <tr class="total">
+            <td class="red">TOTAL HARGA (JASA + MATERIAL):</td>
+            <td class="red">Rp ${(data.hargaJualTotal + data.shipping).toLocaleString('id-ID')}</td>
+          </tr>
+        </table>
+      </div>
+      `}
+      
+      <div class="footer">
+        <p><strong>Catatan:</strong></p>
+        <ul>
+          <li>Harga berlaku untuk order minimal sesuai dengan spesifikasi di atas</li>
+          <li>Harga tidak termasuk pajak (akan ditambahkan jika diperlukan)</li>
+          <li>Waktu pengerjaan disesuaikan dengan jadwal produksi</li>
+          <li>Pembayaran bisa dilakukan via transfer bank atau tunai</li>
+        </ul>
+        <p style="margin-top: 20px; text-align: center; color: #374151;">
+          <strong>PT. JLM (JL MACHINERY)</strong><br>
+          Terima kasih atas kepercayaan Anda
+        </p>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  return html;
+}
+
 </script>
 </body>
 </html>
