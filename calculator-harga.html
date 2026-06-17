@@ -299,8 +299,8 @@ input[type=number]:focus,select:focus{border-color:var(--border2);background:var
 // ── KONSTANTA MESIN ──────────────────────────────────────────────
 const MESIN_TETAP = 60;
 const PIERCE_RATE = 100;
-const SHEET_ID    = '1knzvxxnt2ugKXpTMgkQ4QzP8EN_kE_HeOHvw0u7Ny10';
-const SHEET_CSV   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+const SHEET_ID    = '1rajbiw31XE-gta9O2a5O5ZdeUevoTwqQJK7VJ3fJdGM';
+const SHEET_CSV   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=harga%20bahan`;
 
 // ── DATA GAS (per detik, per tebal) ─────────────────────────────
 const GAS = {
@@ -340,7 +340,9 @@ let gas='o2', met='detik', mode='jasa';
 
 // ── UTIL ─────────────────────────────────────────────────────────
 function ip(map, v) {
+  if (!map || typeof map !== 'object') return 0;  // Guard against null/undefined
   const ks = Object.keys(map).map(Number).sort((a,b)=>a-b);
+  if (ks.length === 0) return 0;
   if (map[v] !== undefined) return map[v];
   const lo = ks.filter(k=>k<v).pop(), hi = ks.find(k=>k>v);
   if (lo!=null && hi!=null) return map[lo]+(map[hi]-map[lo])*((v-lo)/(hi-lo));
@@ -738,24 +740,52 @@ window.addEventListener('DOMContentLoaded', function() {
       setTimeout(() => {
         console.log('[AUTO-FILL] Starting auto-fill after 500ms delay...');
         
-        // Set material FIRST
-        const matSelect = document.getElementById('sel-mat');
-        if (matSelect) {
-          matSelect.value = data.material;
-          console.log('[AUTO-FILL] ✓ Material set to:', data.material);
-          
-          // Trigger onMat to populate thickness dropdown
-          if (typeof onMat === 'function') {
-            onMat();
-            console.log('[AUTO-FILL] ✓ onMat() called to populate thickness options');
-          }
-        } else {
-          console.error('[AUTO-FILL] ✗ Material select (#sel-mat) not found!');
-        }
+      // Cross-calculator material key mapping
+      // calculator-waktu uses: cs, ss, al, br
+      // calculator-harga uses: mildsteel, stainless_ss304, aluminium, etc.
+      const MAT_CROSSMAP = {
+        'cs':              'mildsteel',
+        'ss':              'stainless_ss304',
+        'al':              'aluminium',
+        'br':              'mildsteel',
+        // names from calculator-waktu (after rename)
+        'mild steel (ms)': 'mildsteel',
+        'mild steel':      'mildsteel',
+        'mildsteel':       'mildsteel',
+        'stainless steel': 'stainless_ss304',
+        'stainless':       'stainless_ss304',
+        // old name still handled just in case
+        'carbon steel':    'mildsteel',
+        'aluminum':        'aluminium',
+        'aluminium':       'aluminium',
+        'galvanis':        'galvanis',
+        'stainless_ss304': 'stainless_ss304',
+        'stainless_ss201': 'stainless_ss201',
+      };
+      
+      // Resolve material key
+      const rawMat = (data.material || '').toLowerCase().trim();
+      const resolvedMat = MAT_CROSSMAP[rawMat] || MAT_CROSSMAP[data.materialName?.toLowerCase().trim()] || 'mildsteel';
+      console.log('[AUTO-FILL] Material mapping:', rawMat, '→', resolvedMat);
+      
+      // Set material FIRST
+      const matSelect = document.getElementById('sel-mat');
+      if (matSelect) {
+        matSelect.value = resolvedMat;
+        console.log('[AUTO-FILL] ✓ Material set to:', resolvedMat);
         
-        // Wait for thickness dropdown to be populated by onMat
-        setTimeout(() => {
-          console.log('[AUTO-FILL] Setting thickness after onMat completes...');
+        // Trigger onMat to populate thickness dropdown
+        if (typeof onMat === 'function') {
+          onMat();
+          console.log('[AUTO-FILL] ✓ onMat() called to populate thickness options');
+        }
+      } else {
+        console.error('[AUTO-FILL] ✗ Material select (#sel-mat) not found!');
+      }
+      
+      // Wait for thickness dropdown to be populated by onMat
+      setTimeout(() => {
+        console.log('[AUTO-FILL] Setting thickness after onMat completes...');
           
           // Set thickness
           const tblSelect = document.getElementById('sel-tbl');
